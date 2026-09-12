@@ -1,0 +1,26 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["**/migrations/*", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "DJ", "S", "C4", "SIM", "RUF"]
+# RUF012: Django Meta / DRF class attributes are intentionally mutable class-level lists.
+ignore = ["RUF012"]
+# User-facing copy uses typographic characters on purpose: "Colombo – Kandy", "11 × 5", "can’t".
+allowed-confusables = ["–", "×", "’"]
+
+[tool.ruff.lint.per-file-ignores]
+# F811: importing a pytest fixture and then taking it as an argument is how fixtures are shared.
+"**/tests/**" = ["S101", "S105", "S106", "F811"]
+"conftest.py" = ["S101", "S105", "S106", "F811"]
+# "0.0.0.0" in ALLOWED_HOSTS is a host name, not a socket bind.
+"config/settings/*" = ["F405", "S104"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "config"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["test_*.py"]
+addopts = "-ra --strict-markers"

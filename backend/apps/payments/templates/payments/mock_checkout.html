@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Test payment{% if booking %} · {{ booking.booking_reference }}{% endif %}</title>
+  <style>
+    :root { color-scheme: light; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --brand:#4f46e5; --soft:#f8fafc; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:#eef2ff; }
+    main { max-width:460px; margin:40px auto; padding:0 16px; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:0 10px 30px rgba(15,23,42,.08); overflow:hidden; }
+    header { padding:18px 22px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .logo { font-weight:700; letter-spacing:-.01em; }
+    .badge { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#92400e; background:#fef3c7; border-radius:999px; padding:3px 9px; }
+    section { padding:20px 22px; }
+    .amount { font-size:30px; font-weight:750; letter-spacing:-.02em; margin:2px 0 4px; }
+    .muted { color:var(--muted); font-size:13px; }
+    dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:16px 0 0; font-size:13px; }
+    dt { color:var(--muted); } dd { margin:0; text-align:right; font-weight:600; overflow-wrap:anywhere; }
+    fieldset { border:0; padding:0; margin:0 0 16px; }
+    legend { font-size:13px; font-weight:600; margin-bottom:8px; }
+    .methods { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .methods label { border:1px solid var(--line); border-radius:10px; padding:10px 6px; text-align:center; font-size:13px; cursor:pointer; }
+    .methods input { position:absolute; opacity:0; }
+    .methods input:checked + span { color:var(--brand); font-weight:700; }
+    .methods label:has(input:checked) { border-color:var(--brand); background:#eef2ff; }
+    .methods label:has(input:focus-visible) { outline:2px solid var(--brand); outline-offset:2px; }
+    button { width:100%; font:inherit; font-weight:600; border-radius:10px; padding:12px 14px; cursor:pointer; border:1px solid var(--line); background:#fff; color:var(--ink); margin-top:8px; }
+    button.primary { background:var(--brand); border-color:var(--brand); color:#fff; font-size:16px; }
+    button:focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
+    .danger { color:#b91c1c; }
+    .note { background:var(--soft); border-top:1px solid var(--line); padding:14px 22px; font-size:12.5px; color:var(--muted); }
+    .alert { border-radius:10px; padding:12px 14px; background:#fef2f2; color:#991b1b; font-size:14px; }
+    a { color:var(--brand); }
+    small { display:block; color:var(--muted); font-size:12px; margin-top:2px; font-weight:400; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <header>
+      <span class="logo">Test payment gateway</span>
+      <span class="badge">Test mode</span>
+    </header>
+    {% if error %}
+      <section><p class="alert" role="alert">{{ error }}</p></section>
+    {% else %}
+      <section>
+        <p class="muted">Pay {{ app_name }}</p>
+        <p class="amount">{{ payment.currency }} {{ payment.amount|floatformat:"2g" }}</p>
+        <p class="muted">Bus ticket {{ booking.booking_reference }} · {{ booking.trip.route.name }}</p>
+        <dl>
+          <dt>Order</dt><dd>{{ payment.transaction_reference }}</dd>
+          <dt>Departure</dt><dd>{{ booking.boarding_time|default:booking.trip.departure_datetime|date:"D j M Y, g:i A" }}</dd>
+        </dl>
+      </section>
+      <section style="padding-top:0">
+        {% if is_open %}
+          <form method="post">
+            {% csrf_token %}
+            <fieldset>
+              <legend>Pay with</legend>
+              <div class="methods">
+                {% for value, label in methods %}
+                  <label><input type="radio" name="method" value="{{ value }}" {% if forloop.first %}checked{% endif %}><span>{{ label }}</span></label>
+                {% endfor %}
+              </div>
+            </fieldset>
+            <button class="primary" type="submit" name="outcome" value="pay">Pay {{ payment.currency }} {{ payment.amount|floatformat:"2g" }}</button>
+            <button type="submit" name="outcome" value="decline"><span class="danger">Simulate a declined payment</span></button>
+            <button type="submit" name="outcome" value="pay_later">Pay, but hold back the notification<small>Tests the status check when a gateway's notification is late</small></button>
+            <button type="submit" name="outcome" value="cancel">Cancel and go back</button>
+          </form>
+        {% else %}
+          <p class="alert" role="status">This payment is already {{ payment.get_status_display|lower }}.</p>
+          <p><a href="{{ return_url }}">Back to {{ app_name }}</a></p>
+        {% endif %}
+      </section>
+    {% endif %}
+    <p class="note">This page stands in for a real payment gateway during development. No money moves and no card details are asked for or stored. The outcome reaches {{ app_name|default:"the site" }} as a signed server-to-server notification, just like a real gateway.</p>
+  </div>
+</main>
+</body>
+</html>

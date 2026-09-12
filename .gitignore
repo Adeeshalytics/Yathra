@@ -1,0 +1,27 @@
+# Secrets / local config
+.env
+.env.*
+!.env.example
+
+# Python
+backend/.venv/
+__pycache__/
+*.py[cod]
+backend/staticfiles/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+*.tsbuildinfo
+
+# Misc
+*.log
+.DS_Store
+.idea/
+.vscode/
+.claude/
