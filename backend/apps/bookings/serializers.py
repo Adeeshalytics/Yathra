@@ -30,12 +30,13 @@ class PassengerInputSerializer(serializers.Serializer):
     phone = serializers.CharField(
         max_length=32, error_messages={"blank": "Enter a phone number for this passenger."}
     )
+    # Optional: the ticket is texted to the phone; an e-mail address also gets it by e-mail.
     email = serializers.EmailField(
         max_length=254,
-        error_messages={
-            "blank": "Enter an email address for this passenger.",
-            "invalid": "Enter a valid email address.",
-        },
+        required=False,
+        allow_blank=True,
+        default="",
+        error_messages={"invalid": "Enter a valid email address."},
     )
 
     def validate_name(self, value: str) -> str:
@@ -202,6 +203,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "id": str(booking.customer_id),
             "name": booking.customer.name,
             "email": booking.customer.email,
+            "phone": booking.customer.phone,
         }
 
     def get_boarding(self, booking: Booking) -> dict | None:

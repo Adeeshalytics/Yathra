@@ -14,6 +14,20 @@ function apiOrigin(): string {
 }
 
 /**
+ * Where the map tiles come from. Leaflet URLs carry {z}/{x}/{y} placeholders and sometimes a
+ * {s} subdomain, so the host is reduced to something a CSP understands before it is allowed.
+ */
+function tileHost(): string {
+  const url = process.env.NEXT_PUBLIC_MAP_TILE_URL ?? "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+  try {
+    const { protocol, host } = new URL(url.replace("{s}", "a"));
+    return `${protocol}//${host.replace(/^a\./, "*.")}`;
+  } catch {
+    return "";
+  }
+}
+
+/**
  * A deliberately modest policy: it shuts down the things an injected script would reach for
  * (plugins, a rewritten <base>, framing, calls to other origins) without pretending we can drop
  * inline scripts — Next.js inlines its own bootstrap, and a nonce would need middleware on every
@@ -32,8 +46,9 @@ function contentSecurityPolicy(): string {
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self' https:",
-    // QR codes arrive as data: URIs; blob: is used when a downloaded PDF is opened.
-    "img-src 'self' data: blob:",
+    // QR codes arrive as data: URIs; blob: is used when a downloaded PDF is opened; the map
+    // tiles come from whichever tile server is configured.
+    `img-src 'self' data: blob: ${tileHost()}`.trim(),
     "font-src 'self' data:",
     "style-src 'self' 'unsafe-inline'",
     `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,

@@ -7,7 +7,8 @@ import type { AdminTripDetail, AdminTripStop } from "@/lib/api/admin-types";
 
 import { TripForm } from "./trip-form";
 
-const stop = (id: string, name: string) => ({ id, name, city: name, active: true });
+const stop = (id: string, name: string) =>
+  ({ id, name, city: name, active: true, latitude: null, longitude: null }) as const;
 
 function tripStop(sequence: number, name: string, arrival: string, departure: string): AdminTripStop {
   return {

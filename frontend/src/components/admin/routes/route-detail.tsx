@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { DetailList } from "@/components/admin/shared/detail-list";
+import { RouteMapPanel } from "@/components/map/route-map-panel";
 import { BackLink, DetailSkeleton, RecordError } from "@/components/admin/shared/page-parts";
 import { useRecordControls } from "@/components/admin/shared/record-controls";
 import { PageHeader } from "@/components/common/page-header";
@@ -15,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { adminApi } from "@/lib/api/admin";
 import type { AdminRouteStop } from "@/lib/api/admin-types";
+import { geometryForStops } from "@/lib/map";
 import { queryKeys } from "@/lib/api/query-keys";
 import { formatCurrency, formatDate, formatDuration, formatOffset } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -164,8 +166,14 @@ export function RouteDetail({ id }: { id: string }) {
             <CardTitle>Timetable</CardTitle>
             <CardDescription>Times are after the bus leaves {route.origin.name}.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-5">
             <Timeline stops={route.stops} />
+            <RouteMapPanel
+              geometry={geometryForStops(route.stops)}
+              roadPath={route.road_path}
+              heightClassName="h-64 sm:h-80"
+              emptyDescription="None of this route’s stops has coordinates yet. Add a latitude and longitude to each stop to see the line on a map."
+            />
           </CardContent>
         </Card>
         <Card>

@@ -58,10 +58,22 @@ def as_json_row(row: dict) -> dict:
     return {key: jsonify(value) for key, value in row.items()}
 
 
-def report_or_404(key: str):
-    if key not in services.REPORTS:
+def report_or_404(key: str, allowed=None):
+    if key not in (services.REPORTS if allowed is None else allowed):
         raise Http404("No such report.")
     return key
+
+
+class ScopedReportMixin:
+    """
+    Which reports a view may run, and the filters it runs them with. The admin views use every
+    report and the request's own filters; the operator portal narrows both (apps.portal).
+    """
+
+    allowed_reports = None  # None: every report
+
+    def report_params(self, request):
+        return request.query_params
 
 
 def describe(key: str, span: DateRange, report: services.Report) -> dict:
@@ -116,7 +128,7 @@ class ReportCatalogueView(APIView):
         )
 
 
-class ReportDetailView(APIView):
+class ReportDetailView(ScopedReportMixin, APIView):
     """One report: the totals the database calculated, plus a page of rows."""
 
     permission_classes = [IsAdmin]
@@ -128,9 +140,9 @@ class ReportDetailView(APIView):
         summary="Run one report",
     )
     def get(self, request, key: str, *args, **kwargs):
-        report_or_404(key)
+        report_or_404(key, self.allowed_reports)
         span = parse_date_range(request.query_params)
-        report = services.build(key, span, request.query_params)
+        report = services.build(key, span, self.report_params(request))
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(report.rows, request, view=self)
@@ -141,7 +153,7 @@ class ReportDetailView(APIView):
         return response
 
 
-class ReportExportView(APIView):
+class ReportExportView(ScopedReportMixin, APIView):
     """The same report as a file. CSV and Excel carry every row; a PDF is capped for reading."""
 
     permission_classes = [IsAdmin]
@@ -169,9 +181,9 @@ class ReportExportView(APIView):
         summary="Download a report",
     )
     def get(self, request, key: str, *args, **kwargs):
-        report_or_404(key)
+        report_or_404(key, self.allowed_reports)
         span = parse_date_range(request.query_params)
-        report = services.build(key, span, request.query_params)
+        report = services.build(key, span, self.report_params(request))
         export_format = (request.query_params.get("format") or "csv").lower()
 
         rows = report.rows

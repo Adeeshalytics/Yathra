@@ -5,11 +5,13 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.fleet.models import Bus, BusType
 from apps.operators.models import Operator
 from apps.routes.models import Route, Stop
+from apps.routes.serializers import RoadPathSerializer, road_path_of
 
 from .models import Trip, TripStop
 from .search import DEPARTURE_PERIODS, MAX_DAYS_AHEAD, MAX_PASSENGERS, SORTS, Place
@@ -131,20 +133,27 @@ class TripSearchQuerySerializer(serializers.Serializer):
 # Building blocks
 # ---------------------------------------------------------------------------
 class PublicStopSerializer(serializers.ModelSerializer):
+    """A stop as customers see it. Coordinates are null until someone maps the stop."""
+
     class Meta:
         model = Stop
-        fields = ["id", "name", "city"]
+        fields = ["id", "name", "city", "latitude", "longitude"]
         read_only_fields = fields
 
 
 class PublicRouteSerializer(serializers.ModelSerializer):
     origin = PublicStopSerializer(read_only=True)
     destination = PublicStopSerializer(read_only=True)
+    road_path = serializers.SerializerMethodField()
 
     class Meta:
         model = Route
-        fields = ["id", "name", "route_number", "origin", "destination"]
+        fields = ["id", "name", "route_number", "origin", "destination", "road_path"]
         read_only_fields = fields
+
+    @extend_schema_field(RoadPathSerializer)
+    def get_road_path(self, route: Route) -> dict | None:
+        return road_path_of(route)
 
 
 class PublicOperatorSerializer(serializers.ModelSerializer):

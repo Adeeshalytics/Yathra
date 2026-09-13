@@ -19,7 +19,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import type { User } from "@/lib/api/types";
 import { ROLE_HOME, ROLE_LABEL } from "@/lib/auth/roles";
-import { initials } from "@/lib/format";
+import { firstName, initials } from "@/lib/format";
 
 export function UserMenu({ user }: { user: User }) {
   const { logout } = useAuth();
@@ -37,7 +37,7 @@ export function UserMenu({ user }: { user: User }) {
               </AvatarFallback>
             </Avatar>
             <span className="hidden max-w-32 truncate text-sm font-medium sm:inline">
-              {user.name.split(" ")[0]}
+              {firstName(user.name) || "Account"}
             </span>
             <span className="sr-only">Open account menu</span>
           </Button>
@@ -45,8 +45,12 @@ export function UserMenu({ user }: { user: User }) {
         <DropdownMenuContent align="end" className="w-64">
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col gap-0.5">
-              <span className="truncate text-sm font-semibold text-foreground">{user.name}</span>
-              <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+              <span className="truncate text-sm font-semibold text-foreground">
+                {user.name || user.phone}
+              </span>
+              <span className="truncate text-xs text-muted-foreground">
+                {user.email || user.phone}
+              </span>
               <span className="mt-1 text-xs font-medium text-primary">{ROLE_LABEL[user.role]}</span>
             </div>
           </DropdownMenuLabel>

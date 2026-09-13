@@ -173,7 +173,15 @@ const minutes = z
   });
 
 export const routeStopSchema = z.object({
-  stop: z.object({ id: z.string(), name: z.string(), city: z.string(), active: z.boolean() }),
+  stop: z.object({
+    id: z.string(),
+    name: z.string(),
+    city: z.string(),
+    active: z.boolean(),
+    // Carried through the form so the route can be drawn while it is being edited.
+    latitude: z.string().nullable(),
+    longitude: z.string().nullable(),
+  }),
   arrival: minutes,
   departure: minutes,
   boarding: z.boolean(),

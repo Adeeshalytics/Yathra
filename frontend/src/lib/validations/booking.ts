@@ -19,11 +19,13 @@ export const passengerSchema = z.object({
     .trim()
     .min(1, { error: "Enter a phone number." })
     .refine(isValidPhone, { error: "Enter a valid phone number, e.g. 077 123 4567." }),
+  // Optional: tickets are texted to the phone; an email address gets an email copy too.
   email: z
     .string()
     .trim()
-    .min(1, { error: "Enter an email address." })
-    .refine((value) => EMAIL.safeParse(value).success, { error: "Enter a valid email address." }),
+    .refine((value) => value === "" || EMAIL.safeParse(value).success, {
+      error: "Enter a valid email address.",
+    }),
 });
 
 export const passengersSchema = z.object({ passengers: z.array(passengerSchema).min(1) });
@@ -49,7 +51,7 @@ export function passengerDefaults(
         seat_number: seat,
         name: index === 0 ? (user?.name ?? "") : "",
         phone: user?.phone ?? "",
-        email: user?.email ?? "",
+        email: index === 0 ? (user?.email ?? "") : "",
       };
     }),
   };

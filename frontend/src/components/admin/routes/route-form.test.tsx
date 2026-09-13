@@ -7,7 +7,8 @@ import type { AdminRouteDetail, AdminRouteStop } from "@/lib/api/admin-types";
 
 import { RouteForm } from "./route-form";
 
-const stop = (id: string, name: string) => ({ id, name, city: name, active: true });
+const stop = (id: string, name: string) =>
+  ({ id, name, city: name, active: true, latitude: null, longitude: null }) as const;
 
 function routeStop(sequence: number, id: string, name: string, arrival: number, departure: number, boarding: boolean, dropoff: boolean): AdminRouteStop {
   return {
@@ -34,6 +35,7 @@ const ROUTE: AdminRouteDetail = {
   trip_count: 0,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
+  road_path: null,
   stops: [
     routeStop(1, "a", "Colombo", 0, 0, true, false),
     routeStop(2, "b", "Kadawatha", 45, 50, true, true),

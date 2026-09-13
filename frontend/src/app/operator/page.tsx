@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
-import { OperatorOverview } from "@/components/operator/operator-overview";
+import { OperatorDashboard } from "@/components/operator/operator-dashboard";
 
 export const metadata: Metadata = { title: "Overview" };
 
 export default function OperatorHomePage() {
-  return <OperatorOverview />;
+  return <OperatorDashboard />;
 }

@@ -14,6 +14,8 @@ const user = vi.hoisted(() => ({
   name: "Kasuni Fernando",
   email: "kasuni@example.com",
   phone: "+94771234567",
+  phone_verified: true,
+  has_password: true,
   role: "customer" as const,
   is_active: true,
   created_at: "2029-04-02T09:00:00+05:30",

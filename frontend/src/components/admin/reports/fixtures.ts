@@ -13,7 +13,7 @@ export const BOOKING_ROW: AdminBookingRow = {
   booking_reference: "YTABC23456",
   status: "confirmed",
   status_label: "Confirmed",
-  customer: { id: "user-1", name: "Kasuni Fernando", email: "kasuni@example.com" },
+  customer: { id: "user-1", name: "Kasuni Fernando", phone: "+94771234567", email: "kasuni@example.com" },
   route_name: "Colombo – Batticaloa",
   trip_code: "TR7KQ2M9",
   trip: "trip-1",

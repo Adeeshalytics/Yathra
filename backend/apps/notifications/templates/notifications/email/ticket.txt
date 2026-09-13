@@ -1,0 +1,25 @@
+{% autoescape off %}Your {{ app_name }} booking is confirmed.
+
+Booking reference: {{ journey.reference }}
+{{ journey.origin }} to {{ journey.destination }}
+{{ date|date:"l, j F Y" }}
+
+Board at:  {{ journey.boarding_point }}, {{ boarding_clock }}
+Drop-off:  {{ journey.dropoff_point }}{% if dropoff_clock %}, about {{ dropoff_clock }}{% endif %}
+Bus:       {{ journey.bus }} ({{ journey.bus_name }}), {{ journey.operator }}
+
+Passengers
+{% for passenger in passengers %}  Seat {{ passenger.seat_number }}: {{ passenger.name }}
+{% endfor %}
+Paid: {{ total }}
+
+Your e-ticket, with the QR code to show when you board:
+{{ share_url }}
+
+The ticket is also attached to this e-mail as a PDF. Anyone with the link can open the ticket,
+so share it only with the people travelling.
+
+Have a good journey,
+{{ app_name }}
+{{ frontend_url }}
+{% endautoescape %}

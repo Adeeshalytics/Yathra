@@ -20,6 +20,19 @@ export const queryKeys = {
   paymentProviders: ["payments", "providers"] as const,
   payment: (id: string) => ["payments", "detail", id] as const,
   operatorProfile: ["operator", "profile"] as const,
+  sharedTicket: (code: string) => ["tickets", "shared", code] as const,
+  operator: {
+    all: ["operator"] as const,
+    dashboard: ["operator", "dashboard"] as const,
+    trips: (params: Record<string, unknown> = {}) => ["operator", "trips", "list", params] as const,
+    trip: (id: string) => ["operator", "trips", "detail", id] as const,
+    manifest: (id: string) => ["operator", "trips", "detail", id, "manifest"] as const,
+    bookings: (params: Record<string, unknown> = {}) =>
+      ["operator", "bookings", "list", params] as const,
+    booking: (id: string) => ["operator", "bookings", "detail", id] as const,
+    report: (key: string, params: Record<string, unknown> = {}) =>
+      ["operator", "reports", key, params] as const,
+  },
   admin: {
     all: ["admin"] as const,
     dashboard: ["admin", "dashboard"] as const,

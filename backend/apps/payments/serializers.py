@@ -145,7 +145,12 @@ class AdminPaymentSerializer(PaymentSerializer):
 
     def get_customer(self, payment: Payment) -> dict:
         customer = payment.booking.customer
-        return {"id": str(customer.pk), "name": customer.name, "email": customer.email}
+        return {
+            "id": str(customer.pk),
+            "name": customer.name,
+            "email": customer.email,
+            "phone": customer.phone,
+        }
 
     def get_trip(self, payment: Payment) -> dict:
         trip = payment.booking.trip
@@ -216,7 +221,12 @@ class AdminRefundSerializer(RefundSerializer):
 
     def get_customer(self, refund: Refund) -> dict:
         customer = refund.booking.customer
-        return {"id": str(customer.pk), "name": customer.name, "email": customer.email}
+        return {
+            "id": str(customer.pk),
+            "name": customer.name,
+            "email": customer.email,
+            "phone": customer.phone,
+        }
 
     def get_trip(self, refund: Refund) -> dict:
         trip = refund.booking.trip

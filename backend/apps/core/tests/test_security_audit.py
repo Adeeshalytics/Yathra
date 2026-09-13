@@ -247,6 +247,24 @@ class TestRateLimiting:
         assert throttled.json()["error"]["code"] == "throttled"
         assert "retry_after" in throttled.json()["error"]["details"]
 
+    @pytest.mark.parametrize(
+        ("path", "scope", "body"),
+        [
+            ("/api/v1/auth/phone/code/", "phone_code", {"phone": "12"}),
+            ("/api/v1/auth/phone/verify/", "phone_verify", {"phone": "12", "code": "1"}),
+            ("/api/v1/tickets/find/", "ticket_find", {"reference": "", "phone": ""}),
+        ],
+    )
+    def test_the_public_phone_endpoints_are_throttled(
+        self, api_client, monkeypatch, path, scope, body
+    ):
+        monkeypatch.setattr(SimpleRateThrottle, "THROTTLE_RATES", {scope: "3/min"})
+
+        codes = [api_client.post(path, body, format="json").status_code for _ in range(4)]
+
+        assert codes[:3] == [400, 400, 400]
+        assert codes[3] == 429
+
     def test_seat_locking_has_its_own_limit(self):
         assert settings.SEAT_LOCK_THROTTLE_RATE
         assert settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["anon"]
@@ -411,6 +429,7 @@ class TestErrorLeakage:
 
     def test_production_settings_are_hardened(self, monkeypatch, reload_settings):
         monkeypatch.setenv("PAYMENT_PROVIDERS", "payhere")
+        monkeypatch.setenv("SMS_BACKEND", "notifylk")
         monkeypatch.setenv("DJANGO_ALLOWED_HOSTS", "api.example.com")
         production = reload_settings("config.settings.production")
 
@@ -430,6 +449,18 @@ class TestErrorLeakage:
         monkeypatch.delenv("ALLOW_MOCK_PAYMENTS", raising=False)
 
         with pytest.raises(ImproperlyConfigured):
+            reload_settings("config.settings.production")
+
+
+    def test_production_refuses_to_write_texts_to_the_log(self, monkeypatch, reload_settings):
+        from django.core.exceptions import ImproperlyConfigured
+
+        monkeypatch.setenv("SMS_BACKEND", "console")
+        monkeypatch.setenv("DJANGO_ALLOWED_HOSTS", "api.example.com")
+        monkeypatch.setenv("PAYMENT_PROVIDERS", "payhere")
+        monkeypatch.delenv("ALLOW_CONSOLE_SMS", raising=False)
+
+        with pytest.raises(ImproperlyConfigured, match="sign-in codes"):
             reload_settings("config.settings.production")
 
 

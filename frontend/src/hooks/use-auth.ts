@@ -26,6 +26,13 @@ export function useAuth() {
     return session.user;
   }, []);
 
+  /** Sign in with a texted code (a number we haven't seen before becomes a new account). */
+  const signInWithPhone = useCallback(async (phone: string, code: string) => {
+    const session = await authApi.verifyPhoneCode(phone, code);
+    setSession(session);
+    return session;
+  }, []);
+
   const register = useCallback(async (payload: RegisterPayload) => {
     const session = await authApi.register(payload);
     setSession(session);
@@ -62,6 +69,7 @@ export function useAuth() {
     reason,
     isAuthenticated: status === "authenticated",
     login,
+    signInWithPhone,
     register,
     logout,
     updateProfile,

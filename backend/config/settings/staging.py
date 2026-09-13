@@ -2,15 +2,18 @@
 Staging settings: production, with the things a pre-production site needs.
 
 Staging runs the same hardened stack as production — HTTPS, secure cookies, WhiteNoise, real
-logging — but it is allowed to take fake money through the built-in test gateway, and it serves
-the API documentation so the team can try endpoints out. Nothing here loosens authentication,
+logging — but it is allowed to take fake money through the built-in test gateway, to log text
+messages instead of sending them, and it serves the API documentation so the team can try
+endpoints out. Nothing here loosens authentication,
 authorization or transport security.
 """
 
 import os
 
-# Staging is a production deployment that may use the test gateway.
+# Staging is a production deployment that may use the test gateway, and may write text messages
+# to its log instead of paying to send them.
 os.environ.setdefault("ALLOW_MOCK_PAYMENTS", "true")
+os.environ.setdefault("ALLOW_CONSOLE_SMS", "true")
 
 from .production import *  # noqa: F403
 from .production import env

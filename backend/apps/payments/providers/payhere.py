@@ -83,6 +83,19 @@ def format_amount(amount) -> str:
     return f"{Decimal(amount).quantize(Decimal('0.01')):.2f}"
 
 
+def first_passenger(booking, field: str) -> str:
+    return next((getattr(p, field) for p in booking.passengers.all() if getattr(p, field)), "")
+
+
+def payer_email(booking) -> str:
+    """PayHere insists on an e-mail. Customers who booked with only a phone may not have one."""
+    return (
+        booking.customer.email
+        or first_passenger(booking, "email")
+        or settings.PAYMENT_FALLBACK_EMAIL
+    )
+
+
 class PayHereProvider(PaymentProvider):
     code = "payhere"
     name = "PayHere"
@@ -140,8 +153,8 @@ class PayHereProvider(PaymentProvider):
             "amount": amount,
             "first_name": first_name or "Customer",
             "last_name": last_name or "-",
-            "email": customer.email,
-            "phone": str(customer.phone or ""),
+            "email": payer_email(booking),
+            "phone": str(customer.phone or first_passenger(booking, "phone")),
             "address": "Not provided",
             "city": city,
             "country": "Sri Lanka",

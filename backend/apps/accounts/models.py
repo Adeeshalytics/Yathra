@@ -2,6 +2,7 @@ from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
 from django.db import models
 from django.db.models import Q
+from django.utils.timezone import now
 
 from apps.core.fields import PhoneNumberField
 from apps.core.models import BaseModel
@@ -48,6 +49,15 @@ class UserManager(BaseUserManager["User"]):
     def get_by_natural_key(self, username: str) -> "User":
         return self.get(**{self.model.USERNAME_FIELD: normalize_email(username)})
 
+    def create_phone_customer(self, phone: str, *, name: str = "") -> "User":
+        """A customer who signs in with codes texted to their phone: no e-mail, no password."""
+        user = self.model(
+            phone=phone, name=name, role=UserRole.CUSTOMER, email=None, phone_verified_at=now()
+        )
+        user.set_unusable_password()
+        user.save(using=self._db)
+        return user
+
 
 class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     """
@@ -56,9 +66,15 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     Passwords are only ever stored as salted Argon2 hashes (see PASSWORD_HASHERS).
     """
 
-    name = models.CharField(max_length=150)
-    email = models.EmailField(max_length=254, unique=True)
+    name = models.CharField(max_length=150, blank=True)
+    # Customers who book with just a phone number have no e-mail (NULL, so they don't clash).
+    email = models.EmailField(max_length=254, unique=True, null=True, blank=True)
     phone = PhoneNumberField(blank=True)
+    phone_verified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the user proved the phone is theirs with a texted code.",
+    )
     role = models.CharField(max_length=16, choices=UserRole.choices, default=UserRole.CUSTOMER)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(
@@ -84,17 +100,17 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
         indexes = [models.Index(fields=["role", "is_active"], name="accounts_user_role_active_idx")]
 
     def __str__(self) -> str:
-        return self.email
+        return self.email or self.phone or str(self.pk)
 
     def save(self, *args, **kwargs):
-        self.email = normalize_email(self.email)
+        self.email = normalize_email(self.email) or None
         super().save(*args, **kwargs)
 
     def get_full_name(self) -> str:
         return self.name
 
     def get_short_name(self) -> str:
-        return self.name.split(" ")[0] if self.name else self.email
+        return self.name.split(" ")[0] if self.name else str(self)
 
     @property
     def is_customer(self) -> bool:
@@ -107,3 +123,27 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     @property
     def is_admin(self) -> bool:
         return self.role == UserRole.ADMIN
+
+
+class PhoneVerification(BaseModel):
+    """
+    A sign-in code texted to a phone. Only a keyed hash of the code is kept; it works once,
+    for a few minutes, and only for a handful of guesses. Asking for a new code retires the old.
+    """
+
+    phone = PhoneNumberField()
+    code_hash = models.CharField(max_length=128)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    consumed_at = models.DateTimeField(
+        null=True, blank=True, help_text="Used, replaced by a newer code, or locked out."
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["phone", "-created_at"], name="accounts_phone_code_recent_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Sign-in code for {self.phone}"

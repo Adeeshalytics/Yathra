@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { Loader2Icon, TriangleAlertIcon } from "lucide-react";
+import { Loader2Icon, MessageSquareIcon, TriangleAlertIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -17,9 +17,10 @@ import { FieldGroup } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { applyApiErrors } from "@/lib/forms";
+import type { User } from "@/lib/api/types";
 import {
   changePasswordSchema,
-  profileSchema,
+  profileSchemaFor,
   type ChangePasswordValues,
   type ProfileValues,
 } from "@/lib/validations/account";
@@ -34,20 +35,21 @@ function FormError({ message }: { message: string | null }) {
   );
 }
 
-function ProfileForm({
-  defaults,
-}: {
-  defaults: ProfileValues;
-}) {
+function defaultsFor(user: User): ProfileValues {
+  return { name: user.name, email: user.email ?? "", phone: user.phone };
+}
+
+function ProfileForm({ user }: { user: User }) {
   const { updateProfile } = useAuth();
+  const byPhone = !user.has_password;
   const form = useForm<ProfileValues>({
-    resolver: zodResolver(profileSchema),
-    defaultValues: defaults,
+    resolver: zodResolver(profileSchemaFor({ emailRequired: !byPhone })),
+    defaultValues: defaultsFor(user),
   });
   const mutation = useMutation({
     mutationFn: (values: ProfileValues) => updateProfile(values),
     onSuccess: (user) => {
-      form.reset({ name: user.name, email: user.email, phone: user.phone });
+      form.reset(defaultsFor(user));
       toast.success("Your details were saved.");
     },
     onError: (error) =>
@@ -66,7 +68,9 @@ function ProfileForm({
       <CardHeader>
         <CardTitle>Your details</CardTitle>
         <CardDescription>
-          Your email address is also how you sign in, and where your tickets are sent.
+          {byPhone
+            ? "Your tickets are texted to your phone. Add an email address to get them by email too."
+            : "Your email address is also how you sign in, and where your tickets are sent."}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -83,7 +87,7 @@ function ProfileForm({
             <TextField
               control={form.control}
               name="email"
-              label="Email address"
+              label={byPhone ? "Email address (optional)" : "Email address"}
               type="email"
               autoComplete="email"
               placeholder="you@example.com"
@@ -95,7 +99,12 @@ function ProfileForm({
               type="tel"
               autoComplete="tel"
               placeholder="077 123 4567"
-              description="We use this if a trip changes."
+              readOnly={byPhone}
+              description={
+                byPhone
+                  ? "You sign in with this number. To change it, please contact our support team."
+                  : "Your tickets are texted here, and we use it if a trip changes."
+              }
             />
           </FieldGroup>
           <div className="flex justify-end">
@@ -182,6 +191,25 @@ function PasswordForm() {
   );
 }
 
+/** For customers without a password: how they get in. */
+function PhoneSignInCard({ phone }: { phone: string }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Signing in</CardTitle>
+        <CardDescription>No password to remember.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex items-start gap-3 text-sm">
+        <MessageSquareIcon className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
+        <p>
+          You sign in with a 6-digit code we text to <span className="font-semibold">{phone}</span>.
+          Never share that code with anyone — our team will never ask for it.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 /** The customer's profile: their details, and their password. */
 export function ProfileSettings() {
   const { user } = useAuth();
@@ -200,11 +228,8 @@ export function ProfileSettings() {
       <BackLink href="/account">My account</BackLink>
       <PageHeader title="Profile" description="Keep your contact details and password up to date." />
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-        <ProfileForm
-          key={user.id}
-          defaults={{ name: user.name, email: user.email, phone: user.phone }}
-        />
-        <PasswordForm />
+        <ProfileForm key={user.id} user={user} />
+        {user.has_password ? <PasswordForm /> : <PhoneSignInCard phone={user.phone} />}
       </div>
     </div>
   );

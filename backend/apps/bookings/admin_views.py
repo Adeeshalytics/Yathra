@@ -58,6 +58,7 @@ class AdminBookingListSerializer(serializers.Serializer):
             "id": str(booking.customer_id),
             "name": booking.customer.name,
             "email": booking.customer.email,
+            "phone": booking.customer.phone,
         }
 
 

@@ -17,7 +17,9 @@ import {
   TicketIcon,
   Undo2Icon,
   UsersIcon,
+  WalletIcon,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType, ReactNode } from "react";
@@ -35,6 +37,8 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
+import { operatorApi } from "@/lib/api/endpoints";
+import { queryKeys } from "@/lib/api/query-keys";
 import { cn } from "@/lib/utils";
 
 import { SkipLink } from "./skip-link";
@@ -46,6 +50,8 @@ interface NavItem {
   icon: ComponentType<{ className?: string }>;
   /** Planned sections render disabled until they ship. */
   comingSoon?: boolean;
+  /** Operator portal: only for the company's owners and managers. */
+  managersOnly?: boolean;
 }
 
 interface NavSection {
@@ -105,9 +111,10 @@ const AREAS = {
         title: "Operator portal",
         items: [
           { href: "/operator", label: "Overview", icon: LayoutDashboardIcon },
+          { href: "/operator/trips", label: "Trips", icon: CalendarIcon },
+          { href: "/operator/bookings", label: "Bookings", icon: TicketIcon },
+          { href: "/operator/revenue", label: "Revenue", icon: WalletIcon, managersOnly: true },
           { href: "/operator/fleet", label: "Fleet", icon: BusFrontIcon, comingSoon: true },
-          { href: "/operator/trips", label: "Trips", icon: CalendarIcon, comingSoon: true },
-          { href: "/operator/bookings", label: "Bookings", icon: TicketIcon, comingSoon: true },
         ],
       },
     ],
@@ -188,7 +195,18 @@ function SidebarNav({
 export function DashboardShell({ area, children }: { area: DashboardArea; children: ReactNode }) {
   const pathname = usePathname();
   const { user } = useAuth();
-  const { title, home, sections } = AREAS[area];
+  const { title, home } = AREAS[area];
+  const operatorProfile = useQuery({
+    queryKey: queryKeys.operatorProfile,
+    queryFn: ({ signal }) => operatorApi.profile(signal),
+    enabled: area === "operator",
+    staleTime: 5 * 60 * 1000,
+  });
+  const managesMoney = ["owner", "manager"].includes(operatorProfile.data?.role ?? "");
+  const sections: NavSection[] = AREAS[area].sections.map((section: NavSection) => ({
+    ...section,
+    items: section.items.filter((item) => !item.managersOnly || managesMoney),
+  }));
 
   return (
     <div className="flex min-h-svh flex-1 bg-muted/40">

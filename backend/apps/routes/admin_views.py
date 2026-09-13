@@ -9,6 +9,7 @@ from apps.core.admin_viewsets import ActivationActionsMixin, AdminModelViewSet
 from .admin_serializers import AdminRouteListSerializer, AdminRouteSerializer, AdminStopSerializer
 from .filters import RouteFilter
 from .models import Route, RouteStop, Stop
+from .services import clear_paths_through_stop
 
 
 class AdminStopViewSet(ActivationActionsMixin, AdminModelViewSet):
@@ -20,6 +21,14 @@ class AdminStopViewSet(ActivationActionsMixin, AdminModelViewSet):
 
     def get_queryset(self):
         return Stop.objects.annotate(route_count=Count("route_stops__route", distinct=True))
+
+    def perform_update(self, serializer):
+        """Moving a stop moves every road route through it, so those stored paths are dropped."""
+        was_at = (serializer.instance.latitude, serializer.instance.longitude)
+        super().perform_update(serializer)
+        stop = serializer.instance
+        if (stop.latitude, stop.longitude) != was_at:
+            clear_paths_through_stop(stop)
 
     def get_delete_blocker(self, stop: Stop) -> str | None:
         routes = Route.objects.filter(

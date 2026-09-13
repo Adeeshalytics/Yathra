@@ -15,6 +15,8 @@ const SESSION: AuthResponse = {
     name: "Kasuni Fernando",
     email: "kasuni@example.com",
     phone: "+94771234567",
+    phone_verified: true,
+    has_password: true,
     role: "customer",
     is_active: true,
     created_at: "2030-09-01T09:00:00+05:30",

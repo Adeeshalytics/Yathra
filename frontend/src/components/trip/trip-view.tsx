@@ -21,10 +21,12 @@ import { FacilityList } from "@/components/admin/buses/facilities";
 import { DetailList } from "@/components/admin/shared/detail-list";
 import { BackLink } from "@/components/admin/shared/page-parts";
 import { HoldTimer, useCountdown } from "@/components/booking/hold-countdown";
+import { PhoneSignIn } from "@/components/auth/phone-sign-in";
 import { PassengerDetailsForm } from "@/components/booking/passenger-details-form";
 import { PriceBreakdown } from "@/components/booking/price-breakdown";
 import { EmptyState } from "@/components/common/empty-state";
 import { ErrorState } from "@/components/common/error-state";
+import { RouteMapPanel } from "@/components/map/route-map-panel";
 import { BusSeatPicker, SeatPickerLegend } from "@/components/seats/bus-seat-picker";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +47,7 @@ import { ApiError, getErrorMessage } from "@/lib/api/errors";
 import { queryKeys } from "@/lib/api/query-keys";
 import type { PriceQuote, PublicTrip, StopTime, TripSeat } from "@/lib/api/trip-types";
 import { seatAction } from "@/lib/booking";
+import { geometryForTrip, selectableIds } from "@/lib/map";
 import { formatClock, formatJourney, formatTripDate, minutesBetween } from "@/lib/datetime";
 import { formatCurrency, pluralize } from "@/lib/format";
 import { resolveSegment, usableBoardings } from "@/lib/trip-selection";
@@ -237,6 +240,8 @@ export function TripView({ id }: { id: string }) {
   const [dropoffId, setDropoffId] = useState<string | null>(params.get("dropoff"));
   const [notice, setNotice] = useState<string | null>(null);
   const [signInNeeded, setSignInNeeded] = useState(false);
+  // The seat tapped before signing in: it is held for them the moment they are in.
+  const [seatAfterSignIn, setSeatAfterSignIn] = useState<string | null>(null);
   const [pendingSeat, setPendingSeat] = useState<string | null>(null);
 
   const trip = useQuery({ queryKey: queryKeys.trip(id), queryFn: ({ signal }) => tripsApi.get(id, signal) });
@@ -292,6 +297,10 @@ export function TripView({ id }: { id: string }) {
     boardingId,
     dropoffId,
   });
+  // The map is drawn from the stops the trip already carries, so it costs no extra request.
+  const geometry = geometryForTrip(data.stops);
+  const boardable = selectableIds(usableBoardings(stops.data?.boarding_points ?? [], stops.data?.dropoff_points ?? []));
+  const alightable = selectableIds(segment.dropoffOptions);
   const journeyReady = Boolean(segment.boarding && segment.dropoff);
   const seatsReady = heldSeats.length > 0 && heldSeats.length === passengers && !holdRanOut;
   const lostHold = step === "passengers" && !seatsReady;
@@ -308,6 +317,7 @@ export function TripView({ id }: { id: string }) {
     if (action.kind === "unavailable") return;
     if (action.kind === "sign-in") {
       setSignInNeeded(true);
+      setSeatAfterSignIn(seat.seat_number);
       return;
     }
     if (action.kind === "limit") {
@@ -322,6 +332,22 @@ export function TripView({ id }: { id: string }) {
         await seatLocksApi.lock(id, [seat.seat_number]);
         if (action.kind === "swap") await seatLocksApi.release(action.releaseLockId);
       }
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      await refreshSeats();
+      setPendingSeat(null);
+    }
+  }
+
+  async function holdSeatAfterSignIn() {
+    const seat = seatAfterSignIn;
+    setSignInNeeded(false);
+    setSeatAfterSignIn(null);
+    if (!seat) return;
+    setPendingSeat(seat);
+    try {
+      await seatLocksApi.lock(id, [seat]);
     } catch (error) {
       toast.error(getErrorMessage(error));
     } finally {
@@ -466,6 +492,28 @@ export function TripView({ id }: { id: string }) {
               </Card>
               <Card>
                 <CardHeader>
+                  <CardTitle>Route map</CardTitle>
+                  <CardDescription>
+                    {data.route.origin.name} → {data.route.destination.name} · tap a stop to see
+                    its times, or to get on or off there
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <RouteMapPanel
+                    geometry={geometry}
+                    roadPath={data.route.road_path}
+                    boardingStopId={segment.boarding?.stop.id ?? null}
+                    dropoffStopId={segment.dropoff?.stop.id ?? null}
+                    selectableBoardingIds={boardable}
+                    selectableDropoffIds={alightable}
+                    onSelectBoarding={setBoardingId}
+                    onSelectDropoff={setDropoffId}
+                    emptyDescription="These stops haven’t been placed on the map yet. The list above has every stop and its times."
+                  />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
                   <CardTitle>About this bus</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-5">
@@ -529,21 +577,34 @@ export function TripView({ id }: { id: string }) {
                   </Alert>
                 )}
                 {signInNeeded && !user && (
-                  <Alert>
-                    <LogInIcon />
-                    <AlertDescription>
-                      <span>
-                        <Link href={`/login?next=${encodeURIComponent(here)}`} className="font-semibold text-primary underline-offset-4 hover:underline">
-                          Sign in
-                        </Link>{" "}
-                        or{" "}
-                        <Link href={`/register?next=${encodeURIComponent(here)}`} className="font-semibold text-primary underline-offset-4 hover:underline">
-                          create an account
-                        </Link>{" "}
-                        to hold seats while you book. You’ll come straight back here.
-                      </span>
-                    </AlertDescription>
-                  </Alert>
+                  <section aria-labelledby="hold-sign-in" className="space-y-3 rounded-xl border bg-muted/40 p-4">
+                    <div className="flex items-start gap-3">
+                      <LogInIcon className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
+                      <div className="space-y-1">
+                        <h3 id="hold-sign-in" className="font-semibold">
+                          Enter your mobile number to hold {seatAfterSignIn ? `seat ${seatAfterSignIn}` : "your seats"}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          We’ll text you a code: no password, no forms. Your ticket is sent to this number too.
+                        </p>
+                      </div>
+                    </div>
+                    <PhoneSignIn
+                      emailSignInHref={`/login?next=${encodeURIComponent(here)}`}
+                      onSignedIn={() => void holdSeatAfterSignIn()}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Prefer email?{" "}
+                      <Link href={`/login?next=${encodeURIComponent(here)}`} className="font-semibold text-primary underline-offset-4 hover:underline">
+                        Sign in
+                      </Link>{" "}
+                      or{" "}
+                      <Link href={`/register?next=${encodeURIComponent(here)}`} className="font-semibold text-primary underline-offset-4 hover:underline">
+                        create an account
+                      </Link>
+                      . You’ll come straight back here.
+                    </p>
+                  </section>
                 )}
                 {notice && (
                   <Alert>
@@ -585,7 +646,7 @@ export function TripView({ id }: { id: string }) {
             <Card>
               <CardHeader>
                 <CardTitle>Passenger details</CardTitle>
-                <CardDescription>Full name, phone and email for each seat — tickets go to these contacts.</CardDescription>
+                <CardDescription>A name and mobile number for each seat. Tickets are texted to these numbers; add an email for an email copy too.</CardDescription>
               </CardHeader>
               <CardContent>
                 <PassengerDetailsForm

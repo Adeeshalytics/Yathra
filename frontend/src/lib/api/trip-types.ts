@@ -7,6 +7,24 @@ export interface PublicStop {
   id: string;
   name: string;
   city: string;
+  /** Decimal strings, or null until someone puts the stop on the map. */
+  latitude: string | null;
+  longitude: string | null;
+}
+
+/**
+ * The road the bus drives, worked out once by the backend and cached on the route.
+ * Null until a routing service has answered — the map then joins the stops with straight lines.
+ */
+export interface RoadPath {
+  /** Encoded polyline, origin to destination. */
+  geometry: string;
+  /** Decimal places the encoding used (5 = ~1 m). */
+  precision: number;
+  distance_m: number | null;
+  duration_s: number | null;
+  source: string;
+  updated_at: string | null;
 }
 
 export interface PublicRoute {
@@ -15,6 +33,7 @@ export interface PublicRoute {
   route_number: string;
   origin: PublicStop;
   destination: PublicStop;
+  road_path: RoadPath | null;
 }
 
 export interface PublicBus {

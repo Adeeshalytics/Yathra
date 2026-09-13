@@ -75,7 +75,7 @@ export interface CustomerBooking {
   booking_reference: string;
   status: BookingStatus;
   status_label: string;
-  customer: { id: string; name: string; email: string };
+  customer: { id: string; name: string; email: string | null; phone: string };
   trip: {
     id: string;
     code: string;

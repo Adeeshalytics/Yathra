@@ -44,6 +44,18 @@ class Conflict(exceptions.APIException):
         self.details = details
 
 
+class ServiceUnavailable(exceptions.APIException):
+    """503: something we depend on (a gateway, the SMS provider) can't be used right now."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_detail = "This isn't available right now. Please try again shortly."
+    default_code = "service_unavailable"
+
+    def __init__(self, detail=None, code=None, details: Any = None):
+        super().__init__(detail, code)
+        self.details = details
+
+
 def error_payload(code: str, message: str, details: Any = None) -> dict[str, Any]:
     return {
         "error": {

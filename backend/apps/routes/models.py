@@ -69,6 +69,18 @@ class Route(BaseModel):
     active = models.BooleanField(default=True)
     stops = models.ManyToManyField(Stop, through="RouteStop", related_name="routes")
 
+    # The road the bus actually drives, worked out once by the routing service and kept here so
+    # that drawing a map costs nothing. Cleared whenever the stops (or their coordinates) change,
+    # because a path that no longer matches the stops would be worse than no path at all.
+    path = models.TextField(
+        blank=True,
+        help_text="The road route as an encoded polyline (precision 5), origin to destination.",
+    )
+    path_distance_m = models.PositiveIntegerField(null=True, blank=True)
+    path_duration_s = models.PositiveIntegerField(null=True, blank=True)
+    path_source = models.CharField(max_length=32, blank=True)
+    path_updated_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ["name"]
         indexes = [

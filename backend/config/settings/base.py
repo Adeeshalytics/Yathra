@@ -55,6 +55,7 @@ LOCAL_APPS = [
     "apps.bookings",
     "apps.payments",
     "apps.tickets",
+    "apps.notifications",
     "apps.reports",
 ]
 
@@ -187,6 +188,18 @@ BOOKING_CANCELLATION = {
 }
 
 # ---------------------------------------------------------------------------
+# Road routing (apps/routes/routing.py)
+# ---------------------------------------------------------------------------
+# Where to ask for the road a bus drives between its stops. Anything speaking the OSRM protocol
+# will do; OSRM is OpenStreetMap own routing engine, so its roads match the map tiles. The
+# public demo server is for development only — see docs/route-maps.md for self-hosting.
+ROUTING_SERVICE = {
+    "URL": env("ROUTING_SERVICE_URL", default="https://router.project-osrm.org"),
+    "PROFILE": env("ROUTING_SERVICE_PROFILE", default="driving"),
+    "TIMEOUT_SECONDS": env.float("ROUTING_SERVICE_TIMEOUT_SECONDS", default=8.0),
+}
+
+# ---------------------------------------------------------------------------
 # Payments (apps/payments). Gateway credentials only ever come from the environment.
 # ---------------------------------------------------------------------------
 # Gateways customers can pay with, in display order: "payhere" and/or "mock" (the built-in
@@ -203,6 +216,8 @@ FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000").rstrip("/")
 PUBLIC_API_URL = env("PUBLIC_API_URL", default="http://localhost:8000").rstrip("/")
 # Signs the built-in test gateway's notifications (derived from SECRET_KEY when empty).
 MOCK_PAYMENT_SECRET = env("MOCK_PAYMENT_SECRET", default="")
+# PayHere's checkout needs an e-mail; customers who booked with only a phone number use this.
+PAYMENT_FALLBACK_EMAIL = env("PAYMENT_FALLBACK_EMAIL", default="payments@yathra.lk")
 PAYHERE = {
     "MERCHANT_ID": env("PAYHERE_MERCHANT_ID", default=""),
     "MERCHANT_SECRET": env("PAYHERE_MERCHANT_SECRET", default=""),
@@ -212,6 +227,35 @@ PAYHERE = {
     "SANDBOX": env.bool("PAYHERE_SANDBOX", default=True),
 }
 PAYMENT_VERIFY_THROTTLE_RATE = env("PAYMENT_VERIFY_THROTTLE_RATE", default="20/min")
+
+# ---------------------------------------------------------------------------
+# Text messages and e-mail (apps/notifications): e-tickets, reminders and sign-in codes
+# ---------------------------------------------------------------------------
+SMS = {
+    # "notifylk" (Notify.lk), "console" (writes messages to the log: development only) or ""
+    # (switched off: nothing is texted, and signing in with a phone number is unavailable).
+    "BACKEND": env("SMS_BACKEND", default="console" if DEBUG else ""),
+    # The name messages come from. Notify.lk's test sender is "NotifyDEMO"; ask them to approve
+    # your own before launch (sign-in codes must not be sent from the demo sender).
+    "SENDER_ID": env("SMS_SENDER_ID", default="NotifyDEMO"),
+    "NOTIFYLK_USER_ID": env("NOTIFYLK_USER_ID", default=""),
+    "NOTIFYLK_API_KEY": env("NOTIFYLK_API_KEY", default=""),
+    "TIMEOUT_SECONDS": env.float("SMS_TIMEOUT_SECONDS", default=10.0),
+}
+# E-mail as one URL, e.g. smtp+tls://user:password@smtp.example.com:587. "consolemail://" prints
+# e-mails; "dummymail://" switches e-mail off.
+vars().update(env.email_url("EMAIL_URL", default="consolemail://" if DEBUG else "dummymail://"))
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default=f"{APP_NAME} <tickets@yathra.lk>")
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+NOTIFICATIONS = {
+    # "thread": send in the background the moment the change is saved (send_notifications
+    # retries anything that fails); "worker": leave all sending to send_notifications;
+    # "inline": send before the request finishes (the test suite).
+    "DELIVERY": env("NOTIFICATION_DELIVERY", default="thread"),
+    # Paid bookings get an SMS this many hours before their bus leaves (0 switches it off).
+    "REMINDER_HOURS_BEFORE": env.int("TRIP_REMINDER_HOURS", default=3),
+    "MAX_ATTEMPTS": env.int("NOTIFICATION_MAX_ATTEMPTS", default=5),
+}
 
 # ---------------------------------------------------------------------------
 # Static files
@@ -254,6 +298,12 @@ REST_FRAMEWORK = {
         "anon": env("THROTTLE_RATE_ANON", default="120/min"),
         "user": env("THROTTLE_RATE_USER", default="600/min"),
         "auth": env("THROTTLE_RATE_AUTH", default="10/min"),
+        # Asking for a sign-in code texts someone, and checking one must not allow guessing.
+        "phone_code": env("THROTTLE_RATE_PHONE_CODE", default="5/min"),
+        "phone_verify": env("THROTTLE_RATE_PHONE_VERIFY", default="10/min"),
+        # Opening a shared ticket link, and "Find my booking" (which texts the ticket).
+        "ticket_link": env("THROTTLE_RATE_TICKET_LINK", default="60/min"),
+        "ticket_find": env("THROTTLE_RATE_TICKET_FIND", default="5/min"),
     },
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
 }
@@ -277,6 +327,14 @@ SIMPLE_JWT = {
     # Embed a hash of the password so every token dies when the password changes.
     "CHECK_REVOKE_TOKEN": True,
     "REVOKE_TOKEN_CLAIM": "hash_password",
+}
+
+# Signing in with a code texted to a phone (apps/accounts/phone.py). Customers only.
+PHONE_SIGN_IN = {
+    "CODE_TTL_MINUTES": env.int("PHONE_CODE_TTL_MINUTES", default=5),
+    "MAX_ATTEMPTS": env.int("PHONE_CODE_MAX_ATTEMPTS", default=5),
+    "RESEND_SECONDS": env.int("PHONE_CODE_RESEND_SECONDS", default=60),
+    "MAX_CODES_PER_HOUR": env.int("PHONE_CODE_MAX_PER_HOUR", default=5),
 }
 
 # The refresh token never touches JavaScript: it lives in an HttpOnly cookie scoped to the

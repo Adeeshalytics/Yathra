@@ -70,15 +70,24 @@ still works.
 
 ## 4. Scheduled jobs
 
-Two commands must run on a timer (cron, Kubernetes CronJob, or a scheduler add-on):
+Three commands must run on a timer (cron, Kubernetes CronJob, or a scheduler add-on):
 
 | Command | How often | Why |
 |---------|-----------|-----|
 | `python manage.py expire_seat_holds` | every minute | Puts seats from abandoned checkouts back on sale |
 | `python manage.py reconcile_payments` | every few minutes | Asks gateways about attempts whose notification never arrived |
+| `python manage.py send_notifications` | every minute | Sends departure reminders, and retries any ticket text or e-mail that didn't go through |
 
-Neither is required for correctness — expired holds are also swept whenever a seat map is read —
-but without them seats free up late and a lost notification stays lost.
+None is required for correctness — expired holds are also swept whenever a seat map is read, and
+tickets are sent the moment a booking is paid — but without them seats free up late, a lost
+notification stays lost, a failed text is never retried and nobody is reminded.
+
+### Text messages and e-mail
+
+Before launch, set `SMS_BACKEND=notifylk` with an **approved sender ID** and `EMAIL_URL` to a real
+SMTP service ([notifications.md](notifications.md)). Production refuses to start with the console
+SMS backend. With SMS switched off, tickets aren't texted and customers can't sign in with their
+phone number.
 
 ## 5. Gateway configuration
 

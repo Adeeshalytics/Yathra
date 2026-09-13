@@ -147,7 +147,8 @@ export function AdminBookingDetail({ id }: { id: string }) {
             <DetailList
               items={[
                 { label: "Customer", value: booking.customer.name },
-                { label: "Email", value: booking.customer.email },
+                { label: "Email", value: booking.customer.email || "—" },
+                { label: "Phone", value: booking.customer.phone || "—" },
                 { label: "Booked", value: formatDateTime(booking.created_at) },
                 {
                   label: "Confirmed",

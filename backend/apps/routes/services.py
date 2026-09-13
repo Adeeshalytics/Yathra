@@ -1,8 +1,14 @@
-"""Route timetable rules and the atomic replacement of a route's stop list."""
+"""Route timetable rules, the atomic replacement of a stop list, and the road path."""
 
+import logging
 from datetime import timedelta
 
-from .models import Route, RouteStop
+from django.utils import timezone
+
+from . import routing
+from .models import Route, RouteStop, Stop
+
+logger = logging.getLogger("apps.routes")
 
 MAX_OFFSET_MINUTES = 72 * 60
 
@@ -83,3 +89,77 @@ def replace_route_stops(route: Route, entries: list[dict]) -> bool:
         for sequence, (stop_id, arrival, departure, boarding, dropoff) in enumerate(proposed, 1)
     )
     return True
+
+
+# ---------------------------------------------------------------------------
+# The road a bus drives
+# ---------------------------------------------------------------------------
+PATH_FIELDS = ["path", "path_distance_m", "path_duration_s", "path_source", "path_updated_at"]
+
+
+def route_coordinates(route: Route) -> list[tuple]:
+    """The route stops that have been mapped, in travel order, as (latitude, longitude)."""
+    return [
+        (stop.stop.latitude, stop.stop.longitude)
+        for stop in route.route_stops.select_related("stop").order_by("sequence")
+        if stop.stop.latitude is not None and stop.stop.longitude is not None
+    ]
+
+
+def clear_route_path(route: Route) -> None:
+    """
+    Forget the stored road path.
+
+    Called the moment a route stop list changes: the old geometry belongs to the old stops, and
+    drawing it against the new ones would put the bus on roads it no longer takes. With no path
+    the map falls back to straight lines, which is visibly approximate rather than quietly wrong.
+    """
+    Route.objects.filter(pk=route.pk).update(
+        path="", path_distance_m=None, path_duration_s=None, path_source="", path_updated_at=None
+    )
+
+
+def refresh_route_path(route: Route) -> bool:
+    """
+    Work out the road between this route stops and store it. Returns False when it could not be.
+
+    Failure is never fatal: the routing service is optional infrastructure, so a route simply
+    keeps its straight-line fallback until `refresh_route_paths` picks it up again.
+    """
+    if not routing.is_configured():
+        return False
+
+    coordinates = route_coordinates(route)
+    if len(coordinates) < 2:
+        return False
+
+    try:
+        path = routing.road_path(coordinates)
+    except routing.RoutingUnavailable as exc:
+        logger.warning("No road path for route %s: %s", route.pk, exc)
+        return False
+
+    Route.objects.filter(pk=route.pk).update(
+        path=path.geometry,
+        path_distance_m=path.distance_m,
+        path_duration_s=path.duration_s,
+        path_source=path.source,
+        path_updated_at=timezone.now(),
+    )
+    return True
+
+
+def clear_paths_through_stop(stop: Stop) -> int:
+    """Every route through this stop needs a new road path once the stop itself has moved."""
+    return (
+        Route.objects.filter(route_stops__stop=stop)
+        .exclude(path="")
+        .distinct()
+        .update(
+            path="",
+            path_distance_m=None,
+            path_duration_s=None,
+            path_source="",
+            path_updated_at=None,
+        )
+    )

@@ -21,6 +21,7 @@ const FOOTER_LINKS = [
       { href: "/login", label: "Sign in" },
       { href: "/register", label: "Create account" },
       { href: "/account", label: "My bookings" },
+      { href: "/find-booking", label: "Find my booking" },
     ],
   },
   {

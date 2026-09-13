@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AuthCard } from "@/components/auth/auth-card";
-import { LoginForm } from "@/components/auth/login-form";
+import { LoginPanel } from "@/components/auth/login-panel";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -17,20 +17,20 @@ export default async function LoginPage({
   return (
     <AuthCard
       title="Welcome back"
-      description="Sign in to your customer, operator or admin account."
+      description="Use your phone number — we’ll text you a code. Operators and admins sign in with email."
       footer={
         <>
-          New here?{" "}
+          New here? Just use your phone number above, or{" "}
           <Link
             href={nextPath ? `/register?next=${encodeURIComponent(nextPath)}` : "/register"}
             className="font-semibold text-primary underline-offset-4 hover:underline"
           >
-            Create an account
+            create an account with email
           </Link>
         </>
       }
     >
-      <LoginForm next={nextPath} />
+      <LoginPanel next={nextPath} />
     </AuthCard>
   );
 }

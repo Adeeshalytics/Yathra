@@ -30,6 +30,7 @@ from rest_framework.exceptions import ValidationError
 from apps.core.db import violated_constraint
 from apps.core.exceptions import Conflict
 from apps.core.logging import log_event
+from apps.notifications.services import notify_booking_confirmed
 from apps.payments import refunds as refund_requests
 from apps.payments.models import (
     OPEN_PAYMENT_STATUSES,
@@ -383,11 +384,15 @@ def create_booking(
             seat_number=seat,
             name=details["name"],
             phone=details["phone"],
-            email=details["email"],
+            email=details.get("email", ""),
         )
         for seat, details in zip(seats, passengers, strict=True)
     )
     SeatLock.objects.filter(pk__in=[lock.pk for lock in locks.values()]).delete()
+    if not customer.name.strip():
+        # Accounts made with just a phone number take their name from the first booking.
+        customer.name = passengers[0]["name"]
+        customer.save(update_fields=["name", "updated_at"])
     log_event(
         "booking.created",
         booking_id=str(booking.pk),
@@ -414,6 +419,8 @@ def _confirm(booking: Booking, now) -> None:
     booking.confirmed_at = now
     booking.save(update_fields=["status", "confirmed_at", "updated_at"])
     ticket = issue_ticket(booking, now)
+    # Queued in this transaction, sent once it commits: the ticket by SMS and e-mail.
+    notify_booking_confirmed(booking)
     log_event(
         "booking.confirmed",
         booking_id=str(booking.pk),
@@ -450,7 +457,7 @@ def update_passengers(booking: Booking, passengers: list[dict]) -> Booking:
         passenger.name, passenger.phone, passenger.email = (
             details["name"],
             details["phone"],
-            details["email"],
+            details.get("email", ""),
         )
         passenger.save(update_fields=["name", "phone", "email", "updated_at"])
     return locked

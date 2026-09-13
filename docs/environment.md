@@ -91,6 +91,41 @@ Which settings module reads them is chosen by `DJANGO_SETTINGS_MODULE`:
 | `PAYHERE_SANDBOX` | `true` | no | `false` for live money. |
 | `PAYHERE_APP_ID` / `PAYHERE_APP_SECRET` | empty | no | Business App keys: enable status look-ups and API refunds. **Secret.** |
 | `ALLOW_MOCK_PAYMENTS` | `false` | no | Lets a production-settings deployment keep the test gateway (staging sets this itself). |
+| `PAYMENT_FALLBACK_EMAIL` | `payments@yathra.lk` | no | E-mail given to PayHere's checkout for customers who booked with only a phone number. |
+
+## Text messages and e-mail
+
+Tickets, departure reminders and sign-in codes — see [notifications.md](notifications.md) and
+[phone-sign-in.md](phone-sign-in.md).
+
+| Variable | Default | Required | Description |
+|----------|---------|:--------:|-------------|
+| `SMS_BACKEND` | `console` in debug, else empty | **yes for launch** | `notifylk`, `console` (writes texts to the log; production refuses it) or empty (texts off, phone sign-in unavailable). |
+| `SMS_SENDER_ID` | `NotifyDEMO` | for Notify.lk | Your approved sender name. Never send sign-in codes from the demo sender. |
+| `NOTIFYLK_USER_ID` | empty | for Notify.lk | From the Notify.lk settings page. |
+| `NOTIFYLK_API_KEY` | empty | for Notify.lk | **Secret.** |
+| `SMS_TIMEOUT_SECONDS` | `10` | no | How long to wait for the gateway. |
+| `ALLOW_CONSOLE_SMS` | `false` | no | Lets a production-settings deployment log texts instead of sending them (staging sets this itself). |
+| `EMAIL_URL` | `consolemail://` in debug, else `dummymail://` | **yes for launch** | e.g. `smtp+tls://user:pass@smtp.example.com:587`. `dummymail://` switches e-mail off. **Secret.** |
+| `DEFAULT_FROM_EMAIL` | `Yathra <tickets@yathra.lk>` | no | Sender of ticket e-mails; use a domain with SPF and DKIM. |
+| `NOTIFICATION_DELIVERY` | `thread` | no | `thread`: send in the background as soon as a booking is paid; `worker`: leave all sending to `send_notifications`. |
+| `TRIP_REMINDER_HOURS` | `3` | no | Reminder text this many hours before boarding; `0` switches reminders off. |
+| `NOTIFICATION_MAX_ATTEMPTS` | `5` | no | Tries before a message is marked failed. |
+| `PHONE_CODE_TTL_MINUTES` | `5` | no | How long a sign-in code works. |
+| `PHONE_CODE_MAX_ATTEMPTS` | `5` | no | Wrong guesses before a code locks. |
+| `PHONE_CODE_RESEND_SECONDS` | `60` | no | Wait before another code can be sent to the same phone. |
+| `PHONE_CODE_MAX_PER_HOUR` | `5` | no | Codes per phone per hour. |
+
+## Road routing
+
+The map draws the road a bus drives. It is worked out once per route on the server and cached,
+so the browser never contacts this service — see [route-maps.md](route-maps.md).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ROUTING_SERVICE_URL` | `https://router.project-osrm.org` | Anything speaking the OSRM protocol. The public demo is development-only; self-host for production. Empty disables routing, and maps fall back to dashed straight lines. |
+| `ROUTING_SERVICE_PROFILE` | `driving` | The OSRM profile to ask for. |
+| `ROUTING_SERVICE_TIMEOUT_SECONDS` | `8` | How long to wait before giving up (and trying again later). |
 
 ## Rate limiting
 
@@ -99,6 +134,10 @@ Which settings module reads them is chosen by `DJANGO_SETTINGS_MODULE`:
 | `THROTTLE_RATE_ANON` | `120/min` | Per IP, signed-out. |
 | `THROTTLE_RATE_USER` | `600/min` | Per account. |
 | `THROTTLE_RATE_AUTH` | `10/min` | Sign-in, registration and password change. |
+| `THROTTLE_RATE_PHONE_CODE` | `5/min` | Asking for a sign-in code, per IP. |
+| `THROTTLE_RATE_PHONE_VERIFY` | `10/min` | Checking a sign-in code, per IP. |
+| `THROTTLE_RATE_TICKET_LINK` | `60/min` | Opening shared ticket links, per IP. |
+| `THROTTLE_RATE_TICKET_FIND` | `5/min` | "Find my booking", per IP. |
 
 ## Logging and documentation
 
@@ -126,6 +165,8 @@ must never hold a secret.
 |----------|---------|-------------|
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000/api/v1` | API base URL including the version. Also becomes the `connect-src` of the Content-Security-Policy. |
 | `NEXT_PUBLIC_APP_NAME` | `Yathra` | Product name in the interface. |
+| `NEXT_PUBLIC_MAP_TILE_URL` | OpenStreetMap | Leaflet tile URL. Its host must also be allowed by the CSP in `next.config.ts` (which derives it from this value). |
+| `NEXT_PUBLIC_MAP_TILE_ATTRIBUTION` | OpenStreetMap credit | Shown on every map. Required by the tile licence — see [route-maps.md](route-maps.md). |
 
 ## Docker Compose
 

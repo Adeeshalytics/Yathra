@@ -15,6 +15,7 @@ import type { AdminRouteDetail, RoutePayload } from "@/lib/api/admin-types";
 import { applyApiErrors, fieldErrorList } from "@/lib/forms";
 import { routeSchema, toRoutePayload, type RouteFormValues } from "@/lib/validations/admin";
 
+import { RouteMapPreview } from "./route-map-preview";
 import { RouteStopsEditor } from "./route-stops-editor";
 
 const FIELDS = ["name", "route_number", "description", "base_fare", "active"] as const;
@@ -135,6 +136,18 @@ export function RouteForm({
         </CardHeader>
         <CardContent>
           <RouteStopsEditor form={form} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Route map</CardTitle>
+          <CardDescription>
+            The line follows the stops in the order above. It redraws as you reorder them.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RouteMapPreview form={form} />
         </CardContent>
       </Card>
 

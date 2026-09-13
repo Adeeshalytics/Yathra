@@ -45,4 +45,5 @@ urlpatterns = [
     path("", include("apps.payments.urls")),
     path("", include("apps.tickets.urls")),
     path("", include("apps.operators.urls")),
+    path("", include("apps.portal.urls")),
 ]

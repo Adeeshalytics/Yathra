@@ -85,6 +85,11 @@ export function pluralize(count: number, singular: string, plural = `${singular}
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
+/** The name to greet someone by: their first name, or nothing for a brand-new phone account. */
+export function firstName(name: string | null | undefined): string {
+  return (name ?? "").trim().split(/\s+/)[0] ?? "";
+}
+
 export function initials(name: string): string {
   return (
     name

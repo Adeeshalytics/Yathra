@@ -40,7 +40,15 @@ export function StopPicker({
   const highlighted = Math.min(activeIndex, Math.max(options.length - 1, 0));
 
   const choose = (stop: StopBrief) => {
-    onSelect({ id: stop.id, name: stop.name, city: stop.city, active: stop.active });
+    // The coordinates travel with the choice: the route editor maps the stop straight away.
+    onSelect({
+      id: stop.id,
+      name: stop.name,
+      city: stop.city,
+      active: stop.active,
+      latitude: stop.latitude,
+      longitude: stop.longitude,
+    });
     setOpen(false);
     setSearch("");
     setActiveIndex(0);

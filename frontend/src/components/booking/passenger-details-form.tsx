@@ -19,7 +19,7 @@ import {
   type PassengersFormValues,
 } from "@/lib/validations/booking";
 
-/** Full name, phone and email for every seat. Server validation errors land on the right field. */
+/** A name and phone (and optionally an email) for every seat. Server validation errors land on the right field. */
 export function PassengerDetailsForm({
   id,
   defaultValues,
@@ -86,7 +86,7 @@ export function PassengerDetailsForm({
               control={form.control}
               name={`passengers.${index}.email`}
               id={`passenger-${index}-email`}
-              label="Email"
+              label="Email (optional)"
               type="email"
               inputMode="email"
               autoComplete="email"

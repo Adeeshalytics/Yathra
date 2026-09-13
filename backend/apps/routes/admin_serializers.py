@@ -2,10 +2,18 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .models import Route, Stop
-from .services import MAX_OFFSET_MINUTES, replace_route_stops, validate_route_stops
+from .serializers import RoadPathSerializer, road_path_of
+from .services import (
+    MAX_OFFSET_MINUTES,
+    clear_route_path,
+    refresh_route_path,
+    replace_route_stops,
+    validate_route_stops,
+)
 
 MAX_BASE_FARE = Decimal("100000")
 
@@ -74,9 +82,11 @@ class AdminStopSerializer(serializers.ModelSerializer):
 # Routes
 # ---------------------------------------------------------------------------
 class StopBriefSerializer(serializers.ModelSerializer):
+    """Enough to name a stop and put it on a map."""
+
     class Meta:
         model = Stop
-        fields = ["id", "name", "city", "active"]
+        fields = ["id", "name", "city", "active", "latitude", "longitude"]
         read_only_fields = fields
 
 
@@ -153,9 +163,15 @@ class AdminRouteSerializer(AdminRouteListSerializer):
     """
 
     stops = AdminRouteStopSerializer(many=True, source="route_stops", required=False)
+    road_path = serializers.SerializerMethodField()
 
     class Meta(AdminRouteListSerializer.Meta):
-        fields = [*AdminRouteListSerializer.Meta.fields, "stops"]
+        fields = [*AdminRouteListSerializer.Meta.fields, "stops", "road_path"]
+
+    @extend_schema_field(RoadPathSerializer)
+    def get_road_path(self, route: Route) -> dict | None:
+        """The road the bus drives, once a routing service has worked it out."""
+        return road_path_of(route)
 
     def validate_name(self, value: str) -> str:
         value = " ".join(value.split())
@@ -186,6 +202,7 @@ class AdminRouteSerializer(AdminRouteListSerializer):
         entries = validated_data.pop("route_stops")
         route = Route.objects.create(**validated_data)
         replace_route_stops(route, entries)
+        transaction.on_commit(lambda: refresh_route_path(route))
         return route
 
     @transaction.atomic
@@ -196,4 +213,8 @@ class AdminRouteSerializer(AdminRouteListSerializer):
         instance.save()
         if entries is not None and replace_route_stops(instance, entries):
             self.changed_nested = ["stops"]
+            # The stored road belongs to the old stop list: drop it now, and fetch the new one
+            # once the change is safely committed.
+            clear_route_path(instance)
+            transaction.on_commit(lambda: refresh_route_path(instance))
         return instance

@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { adminApi } from "@/lib/api/admin";
+import { operatorApi } from "@/lib/api/endpoints";
 import { getErrorMessage } from "@/lib/api/errors";
 import { queryKeys } from "@/lib/api/query-keys";
 import type { ManifestRow, TripManifest } from "@/lib/api/report-types";
@@ -52,14 +53,41 @@ function Heading({ manifest }: { manifest: TripManifest }) {
   );
 }
 
-/** The crew's passenger list for one trip: readable on screen, and made to be printed. */
-export function TripManifestView({ tripId }: { tripId: string }) {
+const SOURCES = {
+  admin: {
+    queryKey: queryKeys.admin.manifest,
+    manifest: adminApi.trips.manifest,
+    pdf: adminApi.trips.manifestPdf,
+    tripHref: (id: string) => `/admin/trips/${id}`,
+    listHref: "/admin/trips",
+  },
+  operator: {
+    queryKey: queryKeys.operator.manifest,
+    manifest: operatorApi.trips.manifest,
+    pdf: operatorApi.trips.manifestPdf,
+    tripHref: (id: string) => `/operator/trips/${id}`,
+    listHref: "/operator/trips",
+  },
+};
+
+/**
+ * The crew's passenger list for one trip: readable on screen, and made to be printed. The
+ * admin console and the operator portal show the same sheet, each from its own API.
+ */
+export function TripManifestView({
+  tripId,
+  scope = "admin",
+}: {
+  tripId: string;
+  scope?: keyof typeof SOURCES;
+}) {
+  const source = SOURCES[scope];
   const query = useQuery({
-    queryKey: queryKeys.admin.manifest(tripId),
-    queryFn: ({ signal }) => adminApi.trips.manifest(tripId, signal),
+    queryKey: source.queryKey(tripId),
+    queryFn: ({ signal }) => source.manifest(tripId, signal),
   });
   const download = useMutation({
-    mutationFn: (code: string) => adminApi.trips.manifestPdf(tripId, code),
+    mutationFn: (code: string) => source.pdf(tripId, code),
     onSuccess: ({ blob, filename }) => saveBlob(blob, filename),
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -70,7 +98,7 @@ export function TripManifestView({ tripId }: { tripId: string }) {
       <RecordError
         error={query.error}
         noun="trip"
-        backHref="/admin/trips"
+        backHref={source.listHref}
         onRetry={() => void query.refetch()}
       />
     );
@@ -81,14 +109,16 @@ export function TripManifestView({ tripId }: { tripId: string }) {
   return (
     <div className="space-y-6 print:space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <BackLink href={`/admin/trips/${tripId}`}>Trip</BackLink>
+        <BackLink href={source.tripHref(tripId)}>Trip</BackLink>
         <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" size="lg">
-            <Link href={`/admin/passengers?trip=${tripId}`}>
-              <UsersIcon data-icon="inline-start" />
-              Boarding
-            </Link>
-          </Button>
+          {scope === "admin" && (
+            <Button asChild variant="outline" size="lg">
+              <Link href={`/admin/passengers?trip=${tripId}`}>
+                <UsersIcon data-icon="inline-start" />
+                Boarding
+              </Link>
+            </Button>
+          )}
           <Button
             variant="outline"
             size="lg"

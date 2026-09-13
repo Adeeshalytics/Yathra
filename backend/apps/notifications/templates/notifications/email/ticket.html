@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your {{ app_name }} e-ticket {{ journey.reference }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 12px;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden;">
+        <tr>
+          <td style="background:#0b6e69;color:#ffffff;padding:22px 24px;">
+            <div style="font-size:22px;font-weight:bold;">{{ app_name }}</div>
+            <div style="font-size:13px;opacity:.85;margin-top:4px;">Your booking is confirmed</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:22px 24px 6px;">
+            <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">Booking reference</div>
+            <div style="font-size:24px;font-weight:bold;letter-spacing:.04em;margin-top:2px;">{{ journey.reference }}</div>
+            <div style="font-size:18px;font-weight:bold;margin-top:16px;">{{ journey.origin }} to {{ journey.destination }}</div>
+            <div style="font-size:14px;color:#334155;margin-top:2px;">{{ date|date:"l, j F Y" }}</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:14px 24px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
+              <tr>
+                <td style="padding:6px 0;color:#64748b;width:96px;vertical-align:top;">Board at</td>
+                <td style="padding:6px 0;font-weight:bold;">{{ journey.boarding_point }}, {{ boarding_clock }}</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;color:#64748b;vertical-align:top;">Drop-off</td>
+                <td style="padding:6px 0;">{{ journey.dropoff_point }}{% if dropoff_clock %}, about {{ dropoff_clock }}{% endif %}</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;color:#64748b;vertical-align:top;">Bus</td>
+                <td style="padding:6px 0;">{{ journey.bus }} &middot; {{ journey.bus_name }} &middot; {{ journey.operator }}</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;color:#64748b;vertical-align:top;">Passengers</td>
+                <td style="padding:6px 0;">{% for passenger in passengers %}Seat {{ passenger.seat_number }}: {{ passenger.name }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;color:#64748b;vertical-align:top;">Paid</td>
+                <td style="padding:6px 0;">{{ total }}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 24px 24px;">
+            <a href="{{ share_url }}" style="display:inline-block;background:#0b6e69;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:10px;">Open your e-ticket</a>
+            <p style="font-size:13px;color:#475569;line-height:1.5;margin:16px 0 0;">
+              Show the QR code on the ticket when you board. The ticket is also attached as a PDF.
+              Anyone with the link can open the ticket, so share it only with the people travelling.
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p style="font-size:12px;color:#94a3b8;margin:16px 0 0;">{{ app_name }} &middot; <a href="{{ frontend_url }}" style="color:#94a3b8;">{{ frontend_url }}</a></p>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

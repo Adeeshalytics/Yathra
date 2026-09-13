@@ -84,7 +84,9 @@ in the schema.
 | GET | `/trips/{id}/seats/` | Seat map; includes your own hold when signed in |
 | GET | `/routes/`, `/routes/{id}/` | Routes |
 | GET | `/stops/`, `/stops/{id}/` | Stops |
-| GET | `/tickets/verify/` | Verify a ticket QR code |
+| GET | `/tickets/verify/` | Verify a ticket QR code (admin / operator) |
+| GET | `/tickets/shared/{code}/`, `/tickets/shared/{code}/pdf/` | The ticket behind a link from a ticket SMS or e-mail — no session needed |
+| POST | `/tickets/find/` | "Find my booking": `reference` + a `phone` on the booking; texts the ticket to that phone. Always 202 |
 | GET | `/payments/providers/` | Gateways on offer |
 
 ## Account
@@ -92,7 +94,9 @@ in the schema.
 | Method | Path | Purpose |
 |--------|------|---------|
 | POST | `/auth/register/` | Create a customer account and sign in |
-| POST | `/auth/login/` | Sign in (any role) |
+| POST | `/auth/login/` | Sign in (any role). Optional `phone_proof` links a phone proven by a code |
+| POST | `/auth/phone/code/` | Text a six-digit sign-in code (customers) — see [phone-sign-in.md](phone-sign-in.md) |
+| POST | `/auth/phone/verify/` | Sign in with the code; creates the account for a new number (201) |
 | POST | `/auth/refresh/` | Exchange the refresh cookie for a new access token |
 | POST | `/auth/logout/` | Blacklist the refresh token and clear the cookie |
 | GET / PATCH | `/auth/me/` | Read or update your own name, phone and email |
@@ -157,6 +161,19 @@ returned to a success page.
 Reports share one date filter — `?range=today\|yesterday\|week\|month\|custom\|all` with
 `date_from` / `date_to` for a custom span — plus `route`, `operator`, `bus` and `trip`.
 
+## Operator portal (`operator` role, approved company)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/operator/profile/` | Your company and role |
+| GET | `/operator/dashboard/` | Today, next departures, takings (owners and managers) |
+| GET | `/operator/trips/`, `/operator/trips/{id}/` | Your trips with seats sold and boarded |
+| GET | `/operator/trips/{id}/manifest/`, `/manifest/pdf/` | The manifest |
+| GET | `/operator/bookings/`, `/operator/bookings/{id}/` | Bookings on your trips |
+| GET | `/operator/reports/{revenue\|routes}/`, `/export/` | Takings, owners and managers only |
+
+Everything is limited to your company — see [operator-portal.md](operator-portal.md).
+
 ## Rate limits
 
 | Scope | Default |
@@ -164,6 +181,10 @@ Reports share one date filter — `?range=today\|yesterday\|week\|month\|custom\
 | Anonymous | 120 requests/minute per IP |
 | Signed in | 600 requests/minute per account |
 | Sign-in, registration, password change | 10/minute |
+| Sign-in codes | 5/minute per IP; 1/minute and 5/hour per phone |
+| Checking a sign-in code | 10/minute per IP; 5 guesses per code |
+| Find my booking | 5/minute per IP |
+| Shared ticket links | 60/minute per IP |
 | Seat locking | 60/minute per account |
 | Payment verification | 20/minute |
 

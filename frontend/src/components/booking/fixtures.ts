@@ -2,7 +2,13 @@
 import type { CancellationQuote, CustomerBooking } from "@/lib/api/booking-types";
 import type { CustomerPayment, CustomerTicket } from "@/lib/api/payment-types";
 
-const stop = (id: string, name: string, city = name) => ({ id, name, city });
+const stop = (id: string, name: string, city = name) => ({
+  id,
+  name,
+  city,
+  latitude: null,
+  longitude: null,
+});
 
 /** Nothing paid yet, so cancelling just releases the seats. */
 export const CANCELLATION: CancellationQuote = {
@@ -24,7 +30,7 @@ export const BOOKING: CustomerBooking = {
   booking_reference: "YTABC23456",
   status: "payment_pending",
   status_label: "Payment pending",
-  customer: { id: "user-1", name: "Kasuni Fernando", email: "kasuni@example.com" },
+  customer: { id: "user-1", name: "Kasuni Fernando", email: "kasuni@example.com", phone: "+94771234567" },
   trip: {
     id: "trip-1",
     code: "TR7KQ2M9",
@@ -35,6 +41,7 @@ export const BOOKING: CustomerBooking = {
       route_number: "",
       origin: stop("a", "Colombo Fort", "Colombo"),
       destination: stop("e", "Batticaloa"),
+      road_path: null,
     },
     operator: { id: "operator-1", name: "Ceylon Coach Services" },
     bus: {
@@ -123,6 +130,7 @@ export const TICKET: CustomerTicket = {
   status_label: "Valid",
   is_valid: true,
   issued_at: "2030-09-10T10:03:00+05:30",
+  share_url: "http://localhost:3000/t/AbCdEfGhIjKlMnOpQrStUv",
   qr_code: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=",
   booking: CONFIRMED_BOOKING,
   payment: {

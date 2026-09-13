@@ -26,11 +26,11 @@ class UserAdmin(DjangoUserAdmin):
     list_display = ("email", "name", "phone", "role", "is_active", "is_staff", "created_at")
     list_filter = ("role", "is_active", "is_staff", "is_superuser")
     search_fields = ("email", "name", "phone")
-    readonly_fields = ("id", "last_login", "created_at", "updated_at")
+    readonly_fields = ("id", "last_login", "phone_verified_at", "created_at", "updated_at")
     filter_horizontal = ("groups", "user_permissions")
     fieldsets = (
         (None, {"fields": ("id", "email", "password")}),
-        ("Profile", {"fields": ("name", "phone", "role")}),
+        ("Profile", {"fields": ("name", "phone", "phone_verified_at", "role")}),
         (
             "Permissions",
             {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")},

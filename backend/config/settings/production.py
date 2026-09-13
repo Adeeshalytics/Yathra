@@ -3,7 +3,7 @@
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
-from .base import MIDDLEWARE, PAYMENT_PROVIDERS, STORAGES, env
+from .base import MIDDLEWARE, PAYMENT_PROVIDERS, SMS, STORAGES, env
 
 DEBUG = False
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS")
@@ -13,6 +13,13 @@ if "mock" in PAYMENT_PROVIDERS and not env.bool("ALLOW_MOCK_PAYMENTS", default=F
     raise ImproperlyConfigured(
         "PAYMENT_PROVIDERS includes the test gateway 'mock'. Remove it in production "
         "(or set ALLOW_MOCK_PAYMENTS=true for a staging site)."
+    )
+
+# The console SMS backend writes every message to the log, sign-in codes included.
+if SMS["BACKEND"] in ("console", "locmem") and not env.bool("ALLOW_CONSOLE_SMS", default=False):
+    raise ImproperlyConfigured(
+        f"SMS_BACKEND={SMS['BACKEND']!r} would write sign-in codes to the logs. Use 'notifylk' "
+        "(or leave it empty to switch text messages off) in production."
     )
 
 # WhiteNoise serves the collected static files (Django admin assets) straight from gunicorn.

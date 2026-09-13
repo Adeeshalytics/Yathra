@@ -3,10 +3,41 @@ from datetime import timedelta
 from rest_framework import serializers
 
 from .models import Route, RouteStop, Stop
+from .routing import POLYLINE_PRECISION
 
 
 def _minutes(value: timedelta | None) -> int | None:
     return None if value is None else int(value.total_seconds() // 60)
+
+
+class RoadPathSerializer(serializers.Serializer):
+    """
+    The road the bus drives, as an encoded polyline.
+
+    Null until a routing service has worked it out — the map then falls back to straight lines
+    between the stops, which is obviously approximate rather than quietly wrong.
+    """
+
+    geometry = serializers.CharField(read_only=True)
+    precision = serializers.IntegerField(read_only=True)
+    distance_m = serializers.IntegerField(read_only=True)
+    duration_s = serializers.IntegerField(read_only=True)
+    source = serializers.CharField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
+
+
+def road_path_of(route) -> dict | None:
+    """The stored road path in the shape the API publishes it, or None when there is not one."""
+    if not route.path:
+        return None
+    return {
+        "geometry": route.path,
+        "precision": POLYLINE_PRECISION,
+        "distance_m": route.path_distance_m,
+        "duration_s": route.path_duration_s,
+        "source": route.path_source,
+        "updated_at": route.path_updated_at,
+    }
 
 
 class StopSerializer(serializers.ModelSerializer):

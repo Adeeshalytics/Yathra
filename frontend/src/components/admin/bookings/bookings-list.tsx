@@ -42,7 +42,7 @@ const COLUMNS: DataTableColumn<AdminBookingRow>[] = [
     cell: (booking) => (
       <div className="min-w-40">
         <p className="max-w-48 truncate">{booking.customer.name}</p>
-        <p className="max-w-48 truncate text-xs text-muted-foreground">{booking.customer.email}</p>
+        <p className="max-w-48 truncate text-xs text-muted-foreground">{booking.customer.email || booking.customer.phone}</p>
       </div>
     ),
   },

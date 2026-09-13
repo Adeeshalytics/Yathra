@@ -26,6 +26,7 @@ const NAV_LINKS = [
   { href: "/#popular-routes", label: "Routes" },
   { href: "/#how-it-works", label: "How it works" },
   { href: "/#why-us", label: "Why us" },
+  { href: "/find-booking", label: "Find my booking" },
 ];
 
 export function SiteHeader() {

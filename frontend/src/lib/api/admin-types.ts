@@ -1,5 +1,6 @@
 /** Types for the admin API (/api/v1/admin/...). Money and coordinates arrive as decimal strings. */
 
+import type { RoadPath } from "./trip-types";
 import type { OperatorStatus } from "./types";
 
 export interface AdminOperator {
@@ -118,11 +119,12 @@ export interface StopBrief {
   name: string;
   city: string;
   active: boolean;
+  /** Decimal strings, or null until someone puts the stop on the map. */
+  latitude: string | null;
+  longitude: string | null;
 }
 
 export interface AdminStop extends StopBrief {
-  latitude: string | null;
-  longitude: string | null;
   route_count: number;
   created_at: string;
   updated_at: string;
@@ -163,6 +165,8 @@ export interface AdminRouteSummary {
 
 export interface AdminRouteDetail extends AdminRouteSummary {
   stops: AdminRouteStop[];
+  /** The road the bus drives; null until the routing service has worked it out. */
+  road_path: RoadPath | null;
 }
 
 export interface RouteStopPayload {

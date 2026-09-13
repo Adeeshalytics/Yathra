@@ -25,7 +25,7 @@ import type { BookingScope, BookingSummary } from "@/lib/api/booking-types";
 import { bookingsApi } from "@/lib/api/endpoints";
 import { queryKeys } from "@/lib/api/query-keys";
 import { formatClock, formatTripDate } from "@/lib/datetime";
-import { formatCurrency, formatDate, initials } from "@/lib/format";
+import { formatCurrency, formatDate, firstName, initials } from "@/lib/format";
 
 import { BookingList } from "./booking-list";
 
@@ -115,7 +115,7 @@ export function AccountOverview() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title={`Ayubowan, ${user.name.split(" ")[0]}!`}
+        title={firstName(user.name) ? `Ayubowan, ${firstName(user.name)}!` : "Ayubowan!"}
         description="Your trips, tickets and account details in one place."
         actions={
           <Button asChild variant="cta" size="xl">
@@ -145,7 +145,7 @@ export function AccountOverview() {
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0">
-                <p className="truncate font-semibold">{user.name}</p>
+                <p className="truncate font-semibold">{user.name || user.phone}</p>
                 <p className="text-xs text-muted-foreground">
                   Member since {formatDate(user.created_at)}
                 </p>
@@ -156,7 +156,7 @@ export function AccountOverview() {
                 <dt>
                   <MailIcon className="size-4 text-muted-foreground" aria-label="Email" />
                 </dt>
-                <dd className="truncate">{user.email}</dd>
+                <dd className="truncate">{user.email || "Not added"}</dd>
               </div>
               <div className="flex items-center gap-2">
                 <dt>

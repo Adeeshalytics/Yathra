@@ -30,7 +30,9 @@ describe("PassengerDetailsForm", () => {
 
     expect(field("Full name", 0, "name")).toHaveValue("Kasuni Fernando");
     expect(field("Full name", 1, "name")).toHaveValue("");
-    expect(field("Email", 1, "email")).toHaveValue("kasuni@example.com");
+    // The booker's email is only suggested once; other passengers don't need one.
+    expect(field("Email (optional)", 0, "email")).toHaveValue("kasuni@example.com");
+    expect(field("Email (optional)", 1, "email")).toHaveValue("");
     expect(screen.getByText("Passenger 2 · Seat 16")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Review booking" }));
@@ -44,8 +46,7 @@ describe("PassengerDetailsForm", () => {
     const onSubmit = renderForm();
 
     await user.type(field("Full name", 1, "name"), "  Dilan   Fernando ");
-    await user.clear(field("Email", 1, "email"));
-    await user.type(field("Email", 1, "email"), "DILAN@Example.com");
+    await user.type(field("Email (optional)", 1, "email"), "DILAN@Example.com");
     await user.click(screen.getByRole("button", { name: "Review booking" }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
@@ -53,6 +54,30 @@ describe("PassengerDetailsForm", () => {
       { seat_number: "15", name: "Kasuni Fernando", phone: "+94771234567", email: "kasuni@example.com" },
       { seat_number: "16", name: "Dilan Fernando", phone: "+94771234567", email: "dilan@example.com" },
     ]);
+  });
+
+  it("lets a passenger travel without an email address", async () => {
+    const user = userEvent.setup();
+    const onSubmit = renderForm();
+
+    await user.type(field("Full name", 1, "name"), "Dilan Fernando");
+    await user.clear(field("Email (optional)", 0, "email"));
+    await user.click(screen.getByRole("button", { name: "Review booking" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0].map((p: { email: string }) => p.email)).toEqual(["", ""]);
+  });
+
+  it("still rejects an email address that isn't one", async () => {
+    const user = userEvent.setup();
+    const onSubmit = renderForm();
+
+    await user.type(field("Full name", 1, "name"), "Dilan Fernando");
+    await user.type(field("Email (optional)", 1, "email"), "not-an-email");
+    await user.click(screen.getByRole("button", { name: "Review booking" }));
+
+    expect(await screen.findByText("Enter a valid email address.")).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it("rejects a bad phone number before sending", async () => {
@@ -84,6 +109,6 @@ describe("PassengerDetailsForm", () => {
     await user.click(screen.getByRole("button", { name: "Review booking" }));
 
     expect(await screen.findByText("This email address is blocked.")).toBeInTheDocument();
-    expect(field("Email", 1, "email")).toHaveAttribute("aria-invalid", "true");
+    expect(field("Email (optional)", 1, "email")).toHaveAttribute("aria-invalid", "true");
   });
 });

@@ -23,8 +23,13 @@ Magiya.lk), built in phases:
 - **Phase 7** — the office: every booking, passenger management and the printable trip
   manifest, seven reports with CSV/Excel/PDF exports, and dashboard charts — all aggregated by
   the database. See [§18](#18-phase-7-admin-bookings-passengers--reporting).
-
-Operator self-service and notifications (SMS/e-mail) come later.
+- **Hardening** — the security audit, query budgets, structured logging and the documentation
+  set. See [§19](#19-mvp-hardening).
+- **Route maps** — the journey drawn on OpenStreetMap along the real road, for customers and
+  administrators. See [§20](#20-route-maps).
+- **Launch pack** — tickets by SMS and e-mail with reminders and a shareable ticket link, booking
+  with just a phone number, "Find my booking", and the operator portal. See
+  [§21](#21-launch-pack-tickets-by-text-phone-sign-in-operator-portal).
 
 | Layer    | Stack |
 |----------|-------|
@@ -43,6 +48,10 @@ Operator self-service and notifications (SMS/e-mail) come later.
 | [docs/database.md](docs/database.md) | Schema, constraints, indexes, migrations, backups |
 | [docs/api.md](docs/api.md) | Authentication, the error envelope, and every endpoint |
 | [docs/admin-guide.md](docs/admin-guide.md) | How the office actually uses the admin console |
+| [docs/route-maps.md](docs/route-maps.md) | The route map: what it draws, the tile server, and the path to live GPS |
+| [docs/notifications.md](docs/notifications.md) | Tickets by SMS and e-mail, reminders, ticket links, Find my booking, Notify.lk and SMTP set-up |
+| [docs/phone-sign-in.md](docs/phone-sign-in.md) | Booking with just a phone number: the code flow and its security rules |
+| [docs/operator-portal.md](docs/operator-portal.md) | What bus companies see, who may see the money, and the operator API |
 | [docs/deployment.md](docs/deployment.md) | Building, configuring and releasing to staging or production |
 
 The rest of this file is the architecture and the record of what each phase delivered.
@@ -111,6 +120,7 @@ bus-booking-system/
         │   ├── forms/          # RHF-bound TextField / PasswordField
         │   ├── layout/         # site header/footer, dashboard shell, user menu
         │   ├── admin/          # admin screens per module + shared list/record controls
+        │   ├── map/            # Leaflet route map, markers and the coordinate picker
         │   ├── seats/          # SeatMap: renders a stored seat layout (editor + previews)
         │   ├── booking/        # review, checkout, payment result, e-ticket, cancellation dialog
         │   ├── account/        # dashboard (tabs, summary, booking list) and profile settings
@@ -442,8 +452,9 @@ appears in the logs:
 
 ## 11. What's next (Phase 8+)
 
-Operator self-service (their own trips, bookings and passenger lists) · notifications (SMS and
-e-mail with the e-ticket) · an admin editor for the cancellation policy · platform settings.
+Delivered since: notifications and operator self-service ([§21](#21-launch-pack-tickets-by-text-phone-sign-in-operator-portal)).
+Still to come: a crew boarding scanner, Sinhala and Tamil, an admin editor for the cancellation
+policy, platform settings.
 
 ---
 
@@ -986,3 +997,97 @@ concurrent refreshes share one request and signing out in one tab signs out the 
 `src/components/auth/auth-flow.test.tsx` covers sign-in validation, the server's error messages, a
 network failure, and the route guard — loading, expired (with `?next=`), deliberate sign-out, the
 wrong role and the right one.
+
+---
+
+## 20. Route maps
+
+Every trip and every route now has an interactive map: the origin, each intermediate stop, the
+destination, and the line between them in travel order — with the traveller's own boarding and
+drop-off points picked out. Full detail in [docs/route-maps.md](docs/route-maps.md).
+
+**Leaflet 1.9 + react-leaflet 5 + OpenStreetMap.** The tile server is configuration
+(`NEXT_PUBLIC_MAP_TILE_URL`), so moving to a provider or a self-hosted server later is two
+environment variables and the tile host in the Content-Security-Policy. The line follows the
+road: OSRM (OpenStreetMap's routing engine) is asked once per route on the server and the
+geometry is cached on the route; with no stored road the map draws a dashed line and says so.
+
+**No new endpoint and no extra request.** `Stop` already stored `latitude` / `longitude`
+(nullable, both-or-neither, range-checked), and the trip and route endpoints already returned
+stops in sequence with their times. Adding the two coordinate fields to the stop payload gave
+the map everything it needs — the customer's trip page draws its map from data it had already
+fetched.
+
+**Where it appears**
+
+| Screen | What it does |
+|--------|--------------|
+| `/trips/{id}` | "Route map" card; tap a stop for its times, or to board / get off there |
+| `/admin/routes/new`, `/admin/routes/{id}/edit` | Live preview that redraws as stops are added, removed or reordered |
+| `/admin/routes/{id}` | The saved route beside its timetable |
+| Stop form | **Pick on map** fills in latitude and longitude; typing them moves the marker |
+
+**The parts that are easy to get wrong**
+
+- Choosing a stop from the map is driven by the server's own `boarding_points` and
+  `dropoff_points`, so the map can never offer a journey the API would refuse.
+- A stop without coordinates is not dropped silently: the line skips it and a note names it.
+  When nothing on a route is mapped, the panel says so rather than showing an empty rectangle.
+- Leaflet loads through `next/dynamic` with `ssr: false` — it reads `window` on import, and this
+  also keeps its ~150 KB chunk off every page that has no map.
+- The stop list beside the map is the accessible equivalent; maps are `print:hidden`.
+- The tile host is added to `img-src` in `next.config.ts`, derived from the tile URL. Without
+  that the CSP would block every tile and leave a blank grey map.
+
+**Prepared, not built:** `RouteMap` accepts a `busLocation` and draws a vehicle marker. Nothing
+supplies one yet — live GPS tracking is a later phase, and the remaining questions there are
+about transport and who writes positions, not about the map.
+
+---
+
+## 21. Launch pack: tickets by text, phone sign-in, operator portal
+
+Three things every competitor already offers, built so they are easier here.
+
+### Tickets by SMS and e-mail
+
+When a booking is paid, every phone number on it gets a text with the booking reference, where and
+when to board, the seats, the bus's number plate and the ticket's own link; every e-mail address
+gets the same with the PDF attached. A reminder text follows `TRIP_REMINDER_HOURS` (3) before
+boarding. The link (`/t/<code>`, 128 random bits) opens without an account — it shows the journey
+and the QR code, nothing private — so it works for whoever is actually travelling. Lost the text?
+**Find my booking** (`/find-booking`) texts it again, but only to a phone already on the booking.
+
+Messages are written in the same transaction that confirms the booking (so a duplicate payment
+notification sends one ticket, and nothing is sent for a change that rolled back), sent in the
+background the moment it commits, and retried by `send_notifications` (run it every minute). SMS
+goes through Notify.lk; e-mail through any SMTP service. → [docs/notifications.md](docs/notifications.md)
+
+### Book with just a phone number
+
+Tap a seat while signed out and the seat map asks for a mobile number, texts a six-digit code, and
+holds the seat you tapped as soon as the code is accepted. A new number becomes a customer account
+on the spot — no password, no e-mail (passenger e-mail is now optional everywhere). Codes are
+hashed, single-use, five minutes, five guesses; one a minute and five an hour per phone. Staff
+never sign in by SMS, and a number already on a password account is linked only after one password
+sign-in. → [docs/phone-sign-in.md](docs/phone-sign-in.md)
+
+### The operator portal
+
+`/operator` now shows a company its day (trips, passengers, boarded, bookings paid, takings), its
+trips with seats sold, each trip's stops and bookings, the printable manifest, every booking with
+tap-to-call passenger numbers, and a revenue report by day or by route with CSV/Excel/PDF. Owners
+and managers see money; staff see trips and people. Every query starts from the operator's own
+company, so another company's records are simply not found. → [docs/operator-portal.md](docs/operator-portal.md)
+
+### Verified
+
+* Backend: 126 new tests (932 in all) — ticket delivery, duplicates, retries and claims,
+  reminders, link privacy, Find my booking, Notify.lk request/refusal handling, the whole code
+  flow and its limits, password-account linking, phone-only booking and PayHere checkout, and the
+  portal's permissions, company isolation, numbers and query budgets.
+* Frontend: 27 new tests (277 in all) — phone sign-in, the login tabs and phone linking, the seat
+  map's inline sign-in, optional e-mail, the shared ticket and Find my booking, the operator gate,
+  dashboard, trips, booking detail and revenue.
+* Live against the dev servers: 49 end-to-end checks, from texting a code to downloading the
+  operator's route report.

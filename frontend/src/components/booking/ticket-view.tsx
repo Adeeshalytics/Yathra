@@ -20,6 +20,8 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { formatClock, formatTripDate } from "@/lib/datetime";
 import { formatCurrency, formatDateTime, pluralize } from "@/lib/format";
 import { saveBlob } from "@/lib/payment";
+
+import { ShareTicketButton } from "./share-ticket-button";
 import { siteConfig } from "@/lib/site";
 
 function Field({ label, children, note }: { label: string; children: ReactNode; note?: ReactNode }) {
@@ -100,6 +102,7 @@ export function TicketView({ id }: { id: string }) {
             <PrinterIcon data-icon="inline-start" />
             Print
           </Button>
+          {ticket.is_valid && <ShareTicketButton url={ticket.share_url} reference={booking.booking_reference} />}
         </div>
       </div>
 

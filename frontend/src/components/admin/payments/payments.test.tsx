@@ -32,7 +32,7 @@ const DETAIL: AdminPaymentDetail = {
   payment_method_label: "Card",
   paid_at: "2030-09-10T10:03:00+05:30",
   provider_reference: "MOCK1A2B3C",
-  customer: { id: "user-1", name: "Kasuni Fernando", email: "kasuni@example.com" },
+  customer: { id: "user-1", name: "Kasuni Fernando", email: "kasuni@example.com", phone: "+94771234567" },
   trip: { id: "trip-1", code: "TR7KQ2M9", route: "Colombo – Batticaloa", departure_datetime: "2030-09-15T20:30:00+05:30" },
   refundable_amount: "5150.00",
   refund_through_gateway: true,

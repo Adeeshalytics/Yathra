@@ -164,7 +164,7 @@ export function PaymentDetail({ id }: { id: string }) {
         <Card>
           <CardHeader>
             <CardTitle>Booking</CardTitle>
-            <CardDescription>{payment.customer.email}</CardDescription>
+            <CardDescription>{payment.customer.email || payment.customer.phone}</CardDescription>
           </CardHeader>
           <CardContent>
             <DetailList

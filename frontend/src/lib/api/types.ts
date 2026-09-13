@@ -5,8 +5,13 @@ export type UserRole = "customer" | "operator" | "admin";
 export interface User {
   id: string;
   name: string;
-  email: string;
+  /** Null for customers who booked with just a phone number. */
+  email: string | null;
   phone: string;
+  /** The phone number was proven with a texted code. */
+  phone_verified: boolean;
+  /** False for customers who sign in with codes texted to their phone. */
+  has_password: boolean;
   role: UserRole;
   is_active: boolean;
   created_at: string;
@@ -16,6 +21,21 @@ export interface User {
 export interface AuthResponse {
   access: string;
   user: User;
+}
+
+export interface PhoneCodeSent {
+  phone: string;
+  masked_phone: string;
+  code_length: number;
+  /** Seconds until the code stops working. */
+  expires_in: number;
+  /** Seconds before another code may be sent. */
+  resend_in: number;
+}
+
+export interface PhoneSignInResponse extends AuthResponse {
+  /** A new account was made for this number. */
+  created: boolean;
 }
 
 export interface Paginated<T> {

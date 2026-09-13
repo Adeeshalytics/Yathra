@@ -28,7 +28,7 @@ const REFUND: AdminRefund = {
   resolution: "",
   created_at: "2030-09-10T10:30:00+05:30",
   resolved_at: null,
-  customer: { id: "user-1", name: "Kasuni Fernando", email: "kasuni@example.com" },
+  customer: { id: "user-1", name: "Kasuni Fernando", email: "kasuni@example.com", phone: "+94771234567" },
   trip: {
     id: "trip-1",
     code: "TR7KQ2M9",

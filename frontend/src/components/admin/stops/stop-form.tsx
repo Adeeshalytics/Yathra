@@ -3,9 +3,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2Icon } from "lucide-react";
 import { useId, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 
 import { FormErrorAlert } from "@/components/admin/shared/page-parts";
+import { LocationPicker } from "@/components/map/location-picker";
 import { SwitchField } from "@/components/forms/switch-field";
 import { TextField } from "@/components/forms/text-field";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,8 @@ export function StopForm({
       active: stop?.active ?? true,
     },
   });
+
+  const [latitude, longitude] = useWatch({ control: form.control, name: ["latitude", "longitude"] });
 
   const submit = form.handleSubmit(async (values) => {
     setFormError(null);
@@ -84,8 +87,20 @@ export function StopForm({
           <option key={city} value={city} />
         ))}
       </datalist>
+      <LocationPicker
+        latitude={latitude ?? ""}
+        longitude={longitude ?? ""}
+        onPick={({ latitude: lat, longitude: lng }) => {
+          form.setValue("latitude", lat, { shouldDirty: true, shouldValidate: true });
+          form.setValue("longitude", lng, { shouldDirty: true, shouldValidate: true });
+        }}
+        onClear={() => {
+          form.setValue("latitude", "", { shouldDirty: true, shouldValidate: true });
+          form.setValue("longitude", "", { shouldDirty: true, shouldValidate: true });
+        }}
+      />
       <p className="text-xs text-muted-foreground">
-        Tip: in Google Maps, right-click the bus stand and copy its coordinates.
+        Coordinates are optional, but a stop without them is left off the route map.
       </p>
       <SwitchField
         control={form.control}

@@ -17,7 +17,8 @@ function issues(result: { success: boolean; error?: { issues: { path: PropertyKe
     : (result.error?.issues ?? []).map((issue) => ({ path: issue.path.join("."), message: issue.message }));
 }
 
-const stop = (id: string) => ({ id, name: id, city: id, active: true });
+const stop = (id: string) =>
+  ({ id, name: id, city: id, active: true, latitude: null, longitude: null }) as const;
 const row = (id: string, arrival: number, departure = arrival, boarding = true, dropoff = true) => ({
   stop: stop(id),
   arrival: String(arrival),

@@ -21,11 +21,32 @@ import type {
   TripSearchResponse,
   TripStopsResponse,
 } from "./trip-types";
-import type { AuthResponse, OperatorProfile, Paginated, Route, Stop, User } from "./types";
+import type {
+  OperatorBookingDetail,
+  OperatorBookingRow,
+  OperatorDashboard,
+  OperatorReportKey,
+  OperatorTripDetail,
+  OperatorTripRow,
+  SharedTicket,
+} from "./portal-types";
+import type { ExportFormat, ReportResponse, TripManifest } from "./report-types";
+import type {
+  AuthResponse,
+  OperatorProfile,
+  Paginated,
+  PhoneCodeSent,
+  PhoneSignInResponse,
+  Route,
+  Stop,
+  User,
+} from "./types";
 
 export interface LoginPayload {
   email: string;
   password: string;
+  /** Sent after a texted code met an account with a password: signing in links the phone. */
+  phone_proof?: string;
 }
 
 export interface RegisterPayload {
@@ -52,6 +73,12 @@ export const authApi = {
   register: (payload: RegisterPayload) =>
     api.post<AuthResponse>("/auth/register/", payload, { auth: false }),
   logout: () => api.post<void>("/auth/logout/", undefined, { auth: false }),
+  /** Text a six-digit sign-in code (customers). */
+  requestPhoneCode: (phone: string) =>
+    api.post<PhoneCodeSent>("/auth/phone/code/", { phone }, { auth: false }),
+  /** Sign in with the texted code; a number we haven't seen becomes a new account. */
+  verifyPhoneCode: (phone: string, code: string) =>
+    api.post<PhoneSignInResponse>("/auth/phone/verify/", { phone, code }, { auth: false }),
   me: () => api.get<User>("/auth/me/"),
   updateProfile: (payload: ProfilePayload) => api.patch<User>("/auth/me/", payload),
   /** Answers with a fresh session: changing the password retires the old tokens. */
@@ -136,6 +163,46 @@ export const refundsApi = {
     api.get<Paginated<CustomerRefund>>("/refunds/", { query: params, signal }),
 };
 
+export const ticketsApi = {
+  /** The ticket behind a shared link — no session needed, the link is the credential. */
+  shared: (code: string, signal?: AbortSignal) =>
+    api.get<SharedTicket>(`/tickets/shared/${encodeURIComponent(code)}/`, { auth: false, signal }),
+  sharedPdf: (code: string) =>
+    api.blob(`/tickets/shared/${encodeURIComponent(code)}/pdf/`, { auth: false }),
+  /** "Find my booking": texts the ticket to a phone already on the booking. */
+  find: (reference: string, phone: string) =>
+    api.post<{ detail: string }>("/tickets/find/", { reference, phone }, { auth: false }),
+};
+
+type Params = Record<string, string | number | boolean | undefined>;
+
+/** The operator portal: always the signed-in operator's own company. */
 export const operatorApi = {
   profile: (signal?: AbortSignal) => api.get<OperatorProfile>("/operator/profile/", { signal }),
+  dashboard: (signal?: AbortSignal) =>
+    api.get<OperatorDashboard>("/operator/dashboard/", { signal }),
+  trips: {
+    list: (params: Params = {}, signal?: AbortSignal) =>
+      api.get<Paginated<OperatorTripRow>>("/operator/trips/", { query: params, signal }),
+    get: (id: string, signal?: AbortSignal) =>
+      api.get<OperatorTripDetail>(`/operator/trips/${id}/`, { signal }),
+    manifest: (id: string, signal?: AbortSignal) =>
+      api.get<TripManifest>(`/operator/trips/${id}/manifest/`, { signal }),
+    manifestPdf: (id: string, code: string) =>
+      api.download(`/operator/trips/${id}/manifest/pdf/`, `yathra-manifest-${code}.pdf`),
+  },
+  bookings: {
+    list: (params: Params = {}, signal?: AbortSignal) =>
+      api.get<Paginated<OperatorBookingRow>>("/operator/bookings/", { query: params, signal }),
+    get: (id: string, signal?: AbortSignal) =>
+      api.get<OperatorBookingDetail>(`/operator/bookings/${id}/`, { signal }),
+  },
+  reports: {
+    run: (key: OperatorReportKey, params: Params = {}, signal?: AbortSignal) =>
+      api.get<ReportResponse>(`/operator/reports/${key}/`, { query: params, signal }),
+    download: (key: OperatorReportKey, format: ExportFormat, params: Params = {}) =>
+      api.download(`/operator/reports/${key}/export/`, `yathra-${key}.${format}`, {
+        query: { ...params, format },
+      }),
+  },
 };

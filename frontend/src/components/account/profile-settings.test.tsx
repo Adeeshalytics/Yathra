@@ -13,6 +13,8 @@ const auth = vi.hoisted(() => ({
     name: "Kasuni Fernando",
     email: "kasuni@example.com",
     phone: "+94771234567",
+    phone_verified: true,
+    has_password: true,
     role: "customer" as const,
     is_active: true,
     created_at: "2029-04-02T09:00:00+05:30",
@@ -21,6 +23,7 @@ const auth = vi.hoisted(() => ({
   updateProfile: vi.fn(),
   changePassword: vi.fn(),
 }));
+const PASSWORD_USER = { ...auth.user };
 
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => auth }));
 
@@ -37,6 +40,30 @@ describe("ProfileSettings", () => {
   beforeEach(() => {
     auth.updateProfile.mockReset();
     auth.changePassword.mockReset();
+    auth.user = { ...PASSWORD_USER };
+  });
+
+  it("lets a phone-only customer skip the email and keeps their sign-in number fixed", async () => {
+    const person = userEvent.setup();
+    auth.user = { ...PASSWORD_USER, email: null as unknown as string, has_password: false };
+    auth.updateProfile.mockResolvedValue({ ...auth.user, name: "Kasuni Perera" });
+    renderSettings();
+
+    expect(screen.getByLabelText("Email address (optional)")).toHaveValue("");
+    expect(screen.getByLabelText("Mobile number")).toHaveAttribute("readonly");
+    expect(screen.queryByLabelText("Current password")).not.toBeInTheDocument();
+    expect(screen.getByText(/You sign in with a 6-digit code/)).toBeInTheDocument();
+
+    const name = screen.getByLabelText("Full name");
+    await person.clear(name);
+    await person.type(name, "Kasuni Perera");
+    await person.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(auth.updateProfile).toHaveBeenCalledWith({
+      name: "Kasuni Perera",
+      email: "",
+      phone: "+94771234567",
+    });
   });
 
   it("starts from the signed-in details", () => {

@@ -52,6 +52,14 @@ services:
       JWT_REFRESH_TOKEN_LIFETIME_DAYS: ${JWT_REFRESH_TOKEN_LIFETIME_DAYS:-7}
       JWT_REFRESH_COOKIE_SECURE: "false"
       # Payments. "mock" is the built-in test gateway; set PAYHERE_* in .env for real payments.
+      # The line on the route map: any OSRM-compatible service (docs/route-maps.md).
+      ROUTING_SERVICE_URL: ${ROUTING_SERVICE_URL:-https://router.project-osrm.org}
+      # Texts and e-mails: "console" writes them to this container's log (docs/notifications.md).
+      SMS_BACKEND: ${SMS_BACKEND:-console}
+      SMS_SENDER_ID: ${SMS_SENDER_ID:-NotifyDEMO}
+      NOTIFYLK_USER_ID: ${NOTIFYLK_USER_ID:-}
+      NOTIFYLK_API_KEY: ${NOTIFYLK_API_KEY:-}
+      EMAIL_URL: ${EMAIL_URL:-consolemail://}
       PAYMENT_PROVIDERS: ${PAYMENT_PROVIDERS:-mock}
       # Both must be reachable from the browser: gateways redirect customers to them.
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}

@@ -6,7 +6,7 @@ import { resolveSegment, sortSeatNumbers, usableBoardings } from "./trip-selecti
 
 const point = (sequence: number, name: string, city = name): StopTime => ({
   sequence,
-  stop: { id: name.toLowerCase(), name, city },
+  stop: { id: name.toLowerCase(), name, city, latitude: null, longitude: null },
   time: "2030-09-15T20:30:00+05:30",
 });
 

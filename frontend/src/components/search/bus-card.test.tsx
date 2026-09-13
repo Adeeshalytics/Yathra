@@ -5,7 +5,8 @@ import type { StopTime, TripSearchResult } from "@/lib/api/trip-types";
 
 import { BusCard } from "./bus-card";
 
-const stop = (id: string, name: string) => ({ id, name, city: name });
+const stop = (id: string, name: string) =>
+  ({ id, name, city: name, latitude: null, longitude: null }) as const;
 const at = (sequence: number, id: string, name: string, time: string): StopTime => ({
   sequence,
   stop: stop(id, name),
@@ -21,6 +22,7 @@ export const NIGHT_TRIP: TripSearchResult = {
     route_number: "",
     origin: stop("a", "Colombo"),
     destination: stop("e", "Batticaloa"),
+    road_path: null,
   },
   operator: { id: "operator-1", name: "Ceylon Coach Services" },
   bus: {

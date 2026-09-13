@@ -20,11 +20,15 @@ from apps.core.logging import client_ip, log_event
 
 from .cookies import clear_refresh_cookie, get_refresh_token, set_refresh_cookie
 from .models import User
+from .phone import link_proven_phone, request_code, verify_code
 from .serializers import (
     AuthResponseSerializer,
     ChangePasswordSerializer,
     LoginSerializer,
     LogoutRequestSerializer,
+    PhoneCodeRequestSerializer,
+    PhoneCodeSentSerializer,
+    PhoneCodeVerifySerializer,
     ProfileUpdateSerializer,
     RegisterSerializer,
     UserSerializer,
@@ -96,8 +100,68 @@ class LoginView(_PublicAuthView):
             raise
         data = serializer.validated_data
         user = serializer.user
+        if serializer.phone_proof:
+            link_proven_phone(user, serializer.phone_proof)
         log_event("auth.login", user_id=str(user.pk), role=user.role)
         return _auth_response(user, data["refresh"], data["access"], status.HTTP_200_OK)
+
+
+class PhoneCodeRequestView(_PublicAuthView):
+    """Text a six-digit sign-in code to a phone number."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "phone_code"
+
+    @extend_schema(
+        request=PhoneCodeRequestSerializer,
+        responses={
+            202: PhoneCodeSentSerializer,
+            429: OpenApiResponse(description="Asked again too soon (see retry_after)"),
+            503: OpenApiResponse(description="Text messages are unavailable"),
+        },
+        summary="Send a sign-in code by SMS (customers)",
+    )
+    def post(self, request, *args, **kwargs):
+        body = PhoneCodeRequestSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        sent = request_code(body.validated_data["phone"])
+        return Response(sent.as_dict(), status=status.HTTP_202_ACCEPTED)
+
+
+class PhoneCodeVerifyView(_PublicAuthView):
+    """
+    Exchange a texted code for a session. A number we haven't seen before becomes a customer
+    account there and then (201); a known one signs in (200).
+    """
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "phone_verify"
+
+    @extend_schema(
+        request=PhoneCodeVerifySerializer,
+        responses={
+            200: AuthResponseSerializer,
+            201: AuthResponseSerializer,
+            400: OpenApiResponse(description="Wrong, expired or used code"),
+            409: OpenApiResponse(description="password_required: link the number with a password"),
+        },
+        summary="Sign in with a texted code (creates the account if needed)",
+    )
+    def post(self, request, *args, **kwargs):
+        body = PhoneCodeVerifySerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        user, created = verify_code(body.validated_data["phone"], body.validated_data["code"])
+        refresh = LoginSerializer.get_token(user)
+        update_last_login(None, user)
+        log_event("auth.login", user_id=str(user.pk), role=user.role, method="phone")
+        response = _auth_response(
+            user,
+            str(refresh),
+            str(refresh.access_token),
+            status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+        response.data["created"] = created
+        return response
 
 
 class RefreshView(_PublicAuthView):

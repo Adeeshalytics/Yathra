@@ -9,6 +9,7 @@ import type { User } from "@/lib/api/types";
 
 const auth = vi.hoisted(() => ({
   login: vi.fn(),
+  signInWithPhone: vi.fn(),
   register: vi.fn(),
   logout: vi.fn(),
   updateProfile: vi.fn(),
@@ -41,6 +42,7 @@ vi.mock("@/hooks/use-auth", async (importOriginal) => {
       ...authState.current,
       isAuthenticated: authState.current.status === "authenticated",
       login: auth.login,
+      signInWithPhone: auth.signInWithPhone,
       register: auth.register,
       logout: auth.logout,
       updateProfile: auth.updateProfile,
@@ -57,6 +59,8 @@ const CUSTOMER: User = {
   name: "Kasuni Fernando",
   email: "kasuni@example.com",
   phone: "+94771234567",
+  phone_verified: true,
+  has_password: true,
   role: "customer",
   is_active: true,
   created_at: "2030-09-01T09:00:00+05:30",

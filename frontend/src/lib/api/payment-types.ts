@@ -85,7 +85,7 @@ export interface CustomerRefund {
 }
 
 export interface AdminRefund extends CustomerRefund {
-  customer: { id: string; name: string; email: string };
+  customer: { id: string; name: string; email: string | null; phone: string };
   trip: { id: string; code: string; route: string; departure_datetime: string };
   payment: {
     id: string;
@@ -119,6 +119,8 @@ export interface CustomerTicket {
   issued_at: string;
   /** data: URI of an SVG QR code holding only the signed ticket number. */
   qr_code: string;
+  /** The ticket's own link: opens without signing in, so it can be sent to whoever travels. */
+  share_url: string;
   booking: CustomerBooking;
   payment: {
     transaction_reference: string;
@@ -147,7 +149,7 @@ export interface PaymentEvent {
 
 export interface AdminPayment extends CustomerPayment {
   provider_reference: string;
-  customer: { id: string; name: string; email: string };
+  customer: { id: string; name: string; email: string | null; phone: string };
   trip: { id: string; code: string; route: string; departure_datetime: string };
   refundable_amount: string;
   /** The gateway can refund through its API; otherwise refunds are recorded after the fact. */

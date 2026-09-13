@@ -23,14 +23,15 @@ vi.mock("@/lib/api/endpoints", async (importOriginal) => ({
   bookingsApi: api,
 }));
 
-const stop = (id: string, name: string, city = name) => ({ id, name, city });
+const stop = (id: string, name: string, city = name) =>
+  ({ id, name, city, latitude: null, longitude: null }) as const;
 
 const BOOKING: CustomerBooking = {
   id: "booking-1",
   booking_reference: "YTABC23456",
   status: "pending",
   status_label: "Pending",
-  customer: { id: "user-1", name: "Kasuni Fernando", email: "kasuni@example.com" },
+  customer: { id: "user-1", name: "Kasuni Fernando", email: "kasuni@example.com", phone: "+94771234567" },
   trip: {
     id: "trip-1",
     code: "TR7KQ2M9",
@@ -41,6 +42,7 @@ const BOOKING: CustomerBooking = {
       route_number: "",
       origin: stop("a", "Colombo Fort", "Colombo"),
       destination: stop("e", "Batticaloa"),
+      road_path: null,
     },
     operator: { id: "operator-1", name: "Ceylon Coach Services" },
     bus: {

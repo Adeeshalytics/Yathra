@@ -2,6 +2,24 @@ import { z } from "zod";
 
 import { isValidPhone } from "./phone";
 
+const EMAIL = z.email();
+
+/**
+ * Accounts with a password sign in with their email, so it is required. Customers who sign in
+ * with a texted code may leave it empty (it only adds an e-mail copy of their tickets).
+ */
+export function profileSchemaFor({ emailRequired }: { emailRequired: boolean }) {
+  return profileSchema.extend({
+    email: z
+      .string()
+      .trim()
+      .refine((value) => !emailRequired || value.length > 0, { error: "Enter your email address." })
+      .refine((value) => value === "" || EMAIL.safeParse(value).success, {
+        error: "Enter a valid email address.",
+      }),
+  });
+}
+
 export const profileSchema = z.object({
   name: z
     .string()

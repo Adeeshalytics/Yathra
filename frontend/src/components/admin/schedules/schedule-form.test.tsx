@@ -7,7 +7,8 @@ import type { AdminTripSchedule } from "@/lib/api/admin-types";
 
 import { ScheduleForm } from "./schedule-form";
 
-const stop = (id: string, name: string) => ({ id, name, city: name, active: true });
+const stop = (id: string, name: string) =>
+  ({ id, name, city: name, active: true, latitude: null, longitude: null }) as const;
 
 const SCHEDULE: AdminTripSchedule = {
   id: "schedule-1",

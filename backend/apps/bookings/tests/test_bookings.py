@@ -118,10 +118,22 @@ class TestCreating:
         assert response.status_code == 409
         assert not Booking.objects.exists()
 
+    def test_an_email_address_is_optional(self, trip, alice):
+        # The ticket is texted to the phone; an e-mail address only adds an e-mail copy.
+        client = client_for(alice)
+        lock(client, trip, "15")
+        without = {key: value for key, value in passenger("15").items() if key != "email"}
+
+        response = client.post(
+            BOOKINGS, booking_payload(trip, "15", passengers=[without]), format="json"
+        )
+
+        assert response.status_code == 201, response.content
+        assert response.json()["passengers"][0]["email"] == ""
+
     @pytest.mark.parametrize(
         ("overrides", "field"),
         [
-            ({"passengers": [{**passenger("15"), "email": ""}]}, "passengers"),
             ({"passengers": [{**passenger("15"), "email": "not-an-email"}]}, "passengers"),
             ({"passengers": [{**passenger("15"), "phone": "12"}]}, "passengers"),
             ({"passengers": [{**passenger("15"), "phone": ""}]}, "passengers"),
