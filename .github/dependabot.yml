@@ -1,0 +1,68 @@
+# Dependabot opens pull requests when dependencies have new releases; CI then proves whether
+# the upgrade is safe. Security fixes arrive as soon as an advisory is published, regardless of
+# the schedule below. See docs/devops/01-ci.md.
+#
+# cooldown: a brand-new release waits a few days before Dependabot proposes it. Most malicious
+# package releases are found and pulled within days, so this keeps them out of the project.
+# (Security updates ignore the cooldown.)
+
+version: 2
+
+updates:
+  - package-ecosystem: pip
+    directories: ["/backend"] # requirements/base.txt, dev.txt, prod.txt
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Colombo
+    cooldown:
+      default-days: 5
+    groups:
+      python-minor-and-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directories: ["/frontend"]
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Colombo
+    cooldown:
+      default-days: 5
+    groups:
+      # Next.js and its eslint config must move together.
+      nextjs:
+        patterns: ["next", "eslint-config-next", "@next/*"]
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+
+  # Base images in the Dockerfiles (python:3.13-slim, node:24-alpine).
+  - package-ecosystem: docker
+    directories: ["/backend", "/frontend"]
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Colombo
+
+  # postgres and redis in docker-compose.yml.
+  - package-ecosystem: docker-compose
+    directories: ["/"]
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Colombo
+
+  # The pinned action SHAs in .github/workflows (Dependabot updates the "# vX.Y.Z" comment too).
+  - package-ecosystem: github-actions
+    directories: ["/"]
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Colombo
+    cooldown:
+      default-days: 5
+    groups:
+      github-actions:
+        patterns: ["*"]

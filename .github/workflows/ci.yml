@@ -1,0 +1,390 @@
+# Continuous integration for Yathra. See docs/devops/01-ci.md for a walk-through.
+#
+#   pull request ─┬─ backend      ruff, migrations check, pytest on a real Postgres
+#                 ├─ frontend     typecheck, eslint, vitest, next build
+#                 ├─ secrets      gitleaks over the whole git history
+#                 └─ image-scan   build both production images, Trivy gate on CRITICAL
+#
+#   push to main ── all of the above, then
+#                 build (2 images × amd64/arm64, native runners) → publish (multi-arch
+#                 manifest on ghcr.io, tagged sha-<commit> and latest, with a signed
+#                 build-provenance attestation)
+#
+# Third-party actions are pinned to a full commit SHA (the tag is in the comment): a tag can
+# be moved to malicious code, a commit cannot. Dependabot keeps the pins up to date.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push to the same pull request makes the older run pointless. Runs on main are never
+# cancelled, so a half-published image cannot happen.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Least privilege: every job gets read-only access unless it asks for more.
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.13" # matches python:3.13-slim in backend/Dockerfile
+  NODE_VERSION: "24" # matches node:24-alpine in frontend/Dockerfile
+  # NEXT_PUBLIC_* values are compiled into the browser bundle. Until the app is deployed
+  # (docs/devops/01-ci.md, "One image, many environments") the image points at a local API.
+  NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1' }}
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      # The schema relies on Postgres-only features (btree_gist exclusion constraints), so the
+      # tests run against the same Postgres major version as docker-compose.yml.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: yathra
+          POSTGRES_USER: yathra
+          POSTGRES_PASSWORD: yathra-ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U yathra -d yathra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.test
+      DJANGO_SECRET_KEY: ci-only-not-a-secret
+      DATABASE_URL: postgres://yathra:yathra-ci@localhost:5432/yathra
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements/*.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements/dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check . --output-format=github
+
+      - name: Formatting (ruff format)
+        run: ruff format --check .
+
+      - name: Migrations are up to date
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Tests (pytest + coverage)
+        run: pytest -q --cov=apps --cov-report=xml --cov-report=term:skip-covered
+
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        run: |
+          echo "## Backend coverage" >> "$GITHUB_STEP_SUMMARY"
+          coverage report --format=markdown --skip-covered >> "$GITHUB_STEP_SUMMARY" || true
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          retention-days: 14
+          if-no-files-found: ignore
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `npm ci` installs exactly what package-lock.json says and fails if it is out of sync
+      # with package.json — the same check the Docker build makes.
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint (eslint)
+        run: npm run lint
+
+      - name: Tests (vitest)
+        run: npm run test
+
+      - name: Production build
+        run: npm run build
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the whole history: a secret deleted later is still in an old commit
+          persist-credentials: false
+
+      # The gitleaks CLI image, pinned by digest. Run the same command locally with
+      #   docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo
+      - name: gitleaks
+        run: >-
+          docker run --rm -v "$PWD:/repo"
+          ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git /repo --redact --no-banner --verbose
+
+  image-scan:
+    name: Image scan (${{ matrix.image }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write # upload Trivy results to the repository's Security tab
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [backend, frontend]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build production image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ./${{ matrix.image }}
+          target: production
+          load: true
+          push: false
+          tags: yathra-${{ matrix.image }}:ci
+          build-args: ${{ matrix.image == 'frontend' && format('NEXT_PUBLIC_API_URL={0}', env.NEXT_PUBLIC_API_URL) || '' }}
+          # Shares its layer cache with the amd64 publish build of the same image.
+          cache-from: type=gha,scope=${{ matrix.image }}-amd64
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-amd64
+
+      # Full report (every severity) for the Security tab — main branch only, so the tab
+      # always describes what is actually published.
+      - name: Trivy report (SARIF)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: yathra-${{ matrix.image }}:ci
+          scanners: vuln
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-${{ matrix.image }}.sarif
+          hide-progress: true
+
+      - name: Upload to the Security tab
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: trivy-${{ matrix.image }}.sarif
+          category: trivy-${{ matrix.image }}
+
+      # Readable list in the job log of everything HIGH or worse that has a fix.
+      - name: Trivy (HIGH and CRITICAL, informational)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: yathra-${{ matrix.image }}:ci
+          scanners: vuln
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          format: table
+          exit-code: "0"
+          hide-progress: true
+
+      # The gate: a fixable CRITICAL vulnerability fails the build. See docs/devops/01-ci.md
+      # for why HIGH is reported but does not block.
+      - name: Trivy gate (CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: yathra-${{ matrix.image }}:ci
+          scanners: vuln
+          ignore-unfixed: true
+          severity: CRITICAL
+          format: table
+          exit-code: "1"
+          hide-progress: true
+        env:
+          TRIVY_SKIP_DB_UPDATE: "true" # the step above already downloaded it
+
+  # ---- Publishing: main branch only, and only when every check above passed ----------------
+
+  build:
+    name: Build ${{ matrix.image }} (${{ matrix.arch }})
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [backend, frontend, secrets, image-scan]
+    # Native ARM runners (free for public repositories) instead of QEMU emulation: the
+    # Oracle Cloud free servers this will run on are ARM, and an emulated Next.js build is slow.
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        image: [backend, frontend]
+        arch: [amd64, arm64]
+    steps:
+      - name: Image name
+        env:
+          IMAGE: ${{ matrix.image }}
+        # Registry paths must be lower case; the GitHub owner name may not be.
+        run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/yathra-${IMAGE}" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Labels
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE_NAME }}
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Pushed by digest only (no tag yet); the publish job stitches the two architectures
+      # together under the real tags.
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ./${{ matrix.image }}
+          target: production
+          platforms: linux/${{ matrix.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ matrix.image == 'frontend' && format('NEXT_PUBLIC_API_URL={0}', env.NEXT_PUBLIC_API_URL) || '' }}
+          outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+
+      - name: Export digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: digests-${{ matrix.image }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish ${{ matrix.image }}
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+      id-token: write # sign the attestation with the workflow's OIDC identity (Sigstore)
+      attestations: write
+    strategy:
+      matrix:
+        image: [backend, frontend]
+    steps:
+      - name: Image name
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/yathra-${IMAGE}" >> "$GITHUB_ENV"
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: digests-${{ matrix.image }}-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/digests
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # sha-<commit> is the immutable tag deployments will use; latest is a convenience.
+      - name: Tags
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: index
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Create multi-arch manifest
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          args=()
+          while IFS= read -r tag; do args+=(--tag "$tag"); done \
+            < <(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          while IFS= read -r annotation; do args+=(--annotation "$annotation"); done \
+            < <(jq -r '.annotations[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          for digest in *; do args+=("${IMAGE_NAME}@sha256:${digest}"); done
+          docker buildx imagetools create "${args[@]}"
+
+      - name: Inspect
+        id: manifest
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          docker buildx imagetools inspect "${IMAGE_NAME}:${VERSION}"
+          digest=$(docker buildx imagetools inspect "${IMAGE_NAME}:${VERSION}" --format '{{json .Manifest}}' | jq -r .digest)
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### ${IMAGE_NAME}"
+            echo
+            echo "Digest: \`${digest}\`"
+            echo
+            jq -r '.tags[] | "- `" + . + "`"' <<< "$DOCKER_METADATA_OUTPUT_JSON"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Signed proof of which workflow, commit and runner produced this exact image. Anyone can
+      # check it with: gh attestation verify oci://<image>@<digest> --owner <owner>
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.manifest.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false # storage records exist for organization repositories only

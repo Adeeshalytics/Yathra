@@ -5,7 +5,7 @@ from rest_framework.routers import SimpleRouter
 
 from apps.audit.views import ActivityLogViewSet
 from apps.bookings.admin_views import AdminBookingViewSet, AdminPassengerViewSet
-from apps.core.views import HealthCheckView
+from apps.core.views import HealthCheckView, LivenessView
 from apps.dashboard.views import AdminDashboardChartsView, AdminDashboardView
 from apps.fleet.admin_views import AdminBusViewSet, AdminSeatLayoutViewSet
 from apps.operators.admin_views import AdminOperatorViewSet
@@ -30,6 +30,7 @@ admin_router.register("activity", ActivityLogViewSet, basename="admin-activity")
 
 urlpatterns = [
     path("health/", HealthCheckView.as_view(), name="health"),
+    path("health/live/", LivenessView.as_view(), name="health-live"),
     path("auth/", include("apps.accounts.urls")),
     path("admin/dashboard/", AdminDashboardView.as_view(), name="admin-dashboard"),
     path(

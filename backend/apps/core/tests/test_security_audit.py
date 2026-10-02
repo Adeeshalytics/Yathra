@@ -451,7 +451,6 @@ class TestErrorLeakage:
         with pytest.raises(ImproperlyConfigured):
             reload_settings("config.settings.production")
 
-
     def test_production_refuses_to_write_texts_to_the_log(self, monkeypatch, reload_settings):
         from django.core.exceptions import ImproperlyConfigured
 

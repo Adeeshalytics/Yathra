@@ -14,6 +14,22 @@ def test_health_check_reports_ok(api_client):
     }
 
 
+def test_liveness_reports_ok(api_client):
+    response = api_client.get("/api/v1/health/live/")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_liveness_stays_up_when_the_database_is_down(api_client, monkeypatch):
+    # Readiness fails during a database outage; liveness must not, or every API process
+    # would be restarted at once.
+    monkeypatch.setattr("apps.core.views._check_database", lambda: "error")
+
+    assert api_client.get("/api/v1/health/").status_code == 503
+    assert api_client.get("/api/v1/health/live/").status_code == 200
+
+
 def test_every_response_carries_a_request_id(api_client):
     response = api_client.get("/api/v1/health/")
     assert len(response["X-Request-ID"]) >= 8

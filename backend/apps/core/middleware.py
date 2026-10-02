@@ -9,7 +9,7 @@ logger = logging.getLogger("apps.core.request")
 
 REQUEST_ID_HEADER = "X-Request-ID"
 _VALID_REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{8,128}$")
-_QUIET_PATHS = ("/api/v1/health/",)
+_QUIET_PATHS = ("/api/v1/health/", "/api/v1/health/live/")
 
 
 class RequestContextMiddleware:

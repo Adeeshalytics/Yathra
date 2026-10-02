@@ -14,8 +14,25 @@ from .exceptions import GENERIC_SERVER_ERROR, error_payload
 logger = logging.getLogger(__name__)
 
 
+class LivenessView(APIView):
+    """
+    Liveness probe: the process is up and serving requests. It deliberately checks nothing
+    else — if it failed whenever the database did, an orchestrator would restart every
+    healthy API process during a database outage. Readiness is HealthCheckView's job.
+    """
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = []
+
+    @extend_schema(responses=inline_serializer("Liveness", {"status": serializers.CharField()}))
+    def get(self, request, *args, **kwargs):
+        return Response({"status": "ok"})
+
+
 class HealthCheckView(APIView):
-    """Liveness/readiness probe used by Docker, load balancers and the frontend."""
+    """Readiness probe used by Docker, load balancers and the frontend: are the database
+    and the cache reachable, so this process can actually serve traffic?"""
 
     authentication_classes = []
     permission_classes = [AllowAny]
