@@ -14,6 +14,9 @@ should be able to answer about it.
 | **D5 — Observability** | Prometheus (golden signals + business-event metrics), Loki + Alloy logs, Grafana dashboard and unit-tested alert rules shipped in the chart, external uptime checks | [Notes](05-observability.md) |
 | **D6 — Reliability** | Default-deny network policies, k6 load test against SLOs, API autoscaling, continuous PostgreSQL backups with a passing restore drill, runbook | [Notes](06-reliability.md) · [Runbook](runbook.md) |
 
+**Going live:** all six phases are built. The remaining steps need your accounts — follow
+[GO-LIVE.md](GO-LIVE.md), start to finish.
+
 ## Free services this relies on
 
 | Need | Service | Notes |

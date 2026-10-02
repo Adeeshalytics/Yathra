@@ -50,6 +50,7 @@ Magiya.lk), built in phases:
 - **DevOps D5: observability** — Prometheus metrics (including bookings, payments and sign-ins),
   logs in Loki, a Grafana dashboard and unit-tested alert rules shipped with the chart, and an
   external uptime check. See [docs/devops/05-observability.md](docs/devops/05-observability.md).
+- **Going live:** the step-by-step checklist is [docs/devops/GO-LIVE.md](docs/devops/GO-LIVE.md).
 - **DevOps D6: reliability** — default-deny network policies, a k6 load test against
   objectives, API autoscaling, continuous PostgreSQL backups with a tested restore, and a runbook.
   See [docs/devops/06-reliability.md](docs/devops/06-reliability.md).

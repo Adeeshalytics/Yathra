@@ -3,7 +3,7 @@
 host: staging.yathra.example.com # set to your staging domain (docs/devops/04-gitops.md)
 
 image:
-  tag: sha-de7229c
+  tag: sha-82647a2
 
 tls:
   enabled: true
