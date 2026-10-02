@@ -1,8 +1,23 @@
 import { z } from "zod";
 
-const envSchema = z.object({
+/**
+ * Either an absolute URL (the API on another host, as in local development) or a path on this
+ * site such as `/api/v1` (the API behind the same host, as on Kubernetes). With a path, one
+ * built image works on every domain it is deployed to. `//host` is refused: browsers read it
+ * as another site.
+ */
+function isApiBase(value: string): boolean {
+  if (value.startsWith("/")) return /^\/(?!\/)\S*$/.test(value);
+  return URL.canParse(value) && /^https?:$/.test(new URL(value).protocol);
+}
+
+export const envSchema = z.object({
   NEXT_PUBLIC_API_URL: z
-    .url({ error: "NEXT_PUBLIC_API_URL must be an absolute URL, e.g. http://localhost:8000/api/v1" })
+    .string()
+    .refine(isApiBase, {
+      error:
+        "NEXT_PUBLIC_API_URL must be an absolute URL (http://localhost:8000/api/v1) or a path on this site (/api/v1)",
+    })
     .transform((value) => value.replace(/\/+$/, "")),
   NEXT_PUBLIC_APP_NAME: z.string().min(1).default("Yathra"),
   /**

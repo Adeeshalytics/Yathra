@@ -42,6 +42,7 @@ THIRD_PARTY_APPS = [
     "corsheaders",
     "django_filters",
     "drf_spectacular",
+    "django_prometheus",
 ]
 
 LOCAL_APPS = [
@@ -62,6 +63,9 @@ LOCAL_APPS = [
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
+    # First and last: django-prometheus times the whole request and counts responses by view,
+    # method and status (apps.core.metrics serves them).
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "apps.core.middleware.RequestContextMiddleware",
@@ -71,6 +75,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -92,9 +97,14 @@ TEMPLATES = [
     },
 ]
 
-# Believe X-Forwarded-For when logging the caller's address (only true behind a proxy that
-# overwrites it — otherwise clients could forge the addresses in the security log).
+# How many reverse proxies sit in front of the app and append the caller's address to
+# X-Forwarded-For. The caller is the address the outermost trusted proxy appended:
+# entry -N of the header. Anything to the left of it was sent by the client and may be forged.
+# 0 (the default) ignores the header and uses the connection's address. Rate limiting and the
+# security log both identify callers this way. The older boolean TRUST_PROXY_HEADERS=true still
+# means one proxy.
 TRUST_PROXY_HEADERS = env.bool("TRUST_PROXY_HEADERS", default=False)
+TRUSTED_PROXY_COUNT = env.int("TRUSTED_PROXY_COUNT", default=1 if TRUST_PROXY_HEADERS else 0)
 
 # Path the Django admin site is mounted on. Override in production to something non-obvious.
 DJANGO_ADMIN_URL = env("DJANGO_ADMIN_URL", default="django-admin/")
@@ -294,6 +304,9 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ),
+    # Left unset, DRF identifies callers by the *whole* X-Forwarded-For header, which a client
+    # can set to anything — a new value per request would escape every per-address limit.
+    "NUM_PROXIES": TRUSTED_PROXY_COUNT,
     "DEFAULT_THROTTLE_RATES": {
         "anon": env("THROTTLE_RATE_ANON", default="120/min"),
         "user": env("THROTTLE_RATE_USER", default="600/min"),

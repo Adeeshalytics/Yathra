@@ -1,0 +1,10 @@
+// Managed by Ansible (infra/ansible/roles/base).
+// Install security updates every day; reboot for kernel updates at 03:30 Sri Lanka time.
+// On a single node a reboot is a short outage — k3s and the workloads start again by themselves.
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::AutocleanInterval "7";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "03:30";

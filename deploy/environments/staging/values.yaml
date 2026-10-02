@@ -1,0 +1,21 @@
+# Staging on the Oracle Cloud node. Argo CD deploys this file; CI rewrites image.tag after every
+# successful build of main. Change anything else by pull request.
+host: staging.yathra.example.com # set to your staging domain (docs/devops/04-gitops.md)
+
+image:
+  tag: sha-de7229c
+
+tls:
+  enabled: true
+  # Switch to letsencrypt-prod once a staging certificate has been issued.
+  clusterIssuer: letsencrypt-staging
+
+django:
+  settingsModule: config.settings.staging
+
+postgres:
+  storage:
+    size: 5Gi
+
+metrics:
+  enabled: true

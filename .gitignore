@@ -25,3 +25,15 @@ frontend/out/
 .idea/
 .vscode/
 .claude/
+
+# Infrastructure (Terraform / Ansible) — state, variables and generated files stay local
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+crash.log
+infra/terraform/cluster/backend.hcl
+infra/ansible/inventory.yml
+infra/.apply.log
+*.pem

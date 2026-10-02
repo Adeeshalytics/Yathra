@@ -1,0 +1,180 @@
+# Checks for the infrastructure code (infra/). See docs/devops/02-iac.md.
+#
+# These run without any cloud credentials: formatting, validation against the provider schema,
+# linting and a misconfiguration scan. `terraform plan` and `apply` stay on the workstation —
+# CI never holds a key that can change the Oracle Cloud account.
+
+name: Infrastructure
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: infra-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  TERRAFORM_VERSION: "1.16.4" # matches infra/scripts/setup-wsl.sh
+
+jobs:
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Format
+        run: terraform fmt -check -recursive -diff infra/terraform
+
+      # -lockfile=readonly: fail if .terraform.lock.hcl is missing a provider or a checksum,
+      # instead of quietly trusting whatever the registry serves today.
+      - name: Validate
+        run: |
+          for stack in bootstrap cluster; do
+            echo "::group::$stack"
+            terraform -chdir="infra/terraform/$stack" init -backend=false -input=false -lockfile=readonly
+            terraform -chdir="infra/terraform/$stack" validate
+            echo "::endgroup::"
+          done
+
+      - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
+        with:
+          tflint_version: v0.64.0
+
+      - name: Lint (tflint)
+        working-directory: infra/terraform
+        run: tflint --recursive --format compact
+
+      - name: Misconfiguration scan (Trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: infra/terraform
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          hide-progress: true
+
+  helm:
+    name: Helm chart
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: deploy
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.0
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSLo /tmp/kc.tgz https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz
+          echo "9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883  /tmp/kc.tgz" | sha256sum --check
+          tar -xzf /tmp/kc.tgz -C /usr/local/bin kubeconform
+
+      # Lint and validate every environment's values against the chart's values.schema.json.
+      - name: Lint
+        run: |
+          for env in environments/*/; do
+            helm lint charts/yathra --strict --values "$env/values.yaml" --set image.tag=sha-ci
+          done
+
+      # Render with each environment's values and check every object against the Kubernetes
+      # 1.36 API (and the CloudNativePG CRD) — the version k3s runs.
+      - name: Validate rendered manifests
+        run: |
+          for env in environments/*/; do
+            echo "::group::$env"
+            helm template yathra charts/yathra --values "$env/values.yaml" --set image.tag=sha-ci |
+              kubeconform -strict -summary -kubernetes-version 1.36.0 \
+                -schema-location default \
+                -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+            echo "::endgroup::"
+          done
+
+      # Schema validation cannot tell whether an alert's PromQL is valid; Prometheus' own
+      # promtool can. (Rendered with TLS on, so the certificate alert is included.)
+      - name: Check alert rules (promtool)
+        run: |
+          helm template yathra charts/yathra --values environments/staging/values.yaml \
+              --set image.tag=sha-ci --show-only templates/monitoring.yaml |
+            yq 'select(.kind == "PrometheusRule") | {"groups": .spec.groups}' > /tmp/yathra.rules.yaml
+          docker run --rm -v /tmp/yathra.rules.yaml:/rules.yaml:ro --entrypoint promtool \
+            quay.io/prometheus/prometheus:v3.15.0 check rules /rules.yaml
+
+      # The Argo CD Applications and projects each cluster runs, against their CRD schemas.
+      - name: Validate Argo CD manifests
+        run: |
+          for cluster in argocd/clusters/*/; do
+            echo "::group::$cluster"
+            kubectl kustomize "$cluster" |
+              kubeconform -strict -summary \
+                -schema-location default \
+                -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+            echo "::endgroup::"
+          done
+
+      - name: Render for the misconfiguration scan
+        run: |
+          mkdir -p /tmp/rendered
+          helm template yathra charts/yathra --set image.tag=sha-ci --set tls.enabled=true \
+            > /tmp/rendered/yathra.yaml
+
+      # Kubernetes security checks: privileged containers, missing limits, root users, writable
+      # root filesystems, host namespaces, …
+      - name: Misconfiguration scan (Trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: /tmp/rendered
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          hide-progress: true
+
+  ansible:
+    name: Ansible
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: infra/ansible
+    env:
+      ANSIBLE_CONFIG: ${{ github.workspace }}/infra/ansible/ansible.cfg
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install Ansible
+        run: pip install "ansible-core==2.21.4" "ansible-lint==26.9.0"
+
+      - name: Install collections
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Syntax check
+        run: ansible-playbook --syntax-check site.yml
+
+      - name: Lint (ansible-lint, production profile)
+        run: ansible-lint --profile production

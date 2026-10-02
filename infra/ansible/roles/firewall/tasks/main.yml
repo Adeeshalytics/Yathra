@@ -1,0 +1,35 @@
+# Oracle's Ubuntu images ship a host firewall in /etc/iptables/rules.v4 that ends with
+#
+#   -A INPUT   -j REJECT --reject-with icmp-host-prohibited
+#   -A FORWARD -j REJECT --reject-with icmp-host-prohibited
+#
+# The INPUT rule blocks the web ports and stops pods from reaching the node (the API server,
+# the kubelet), which breaks cluster DNS. The FORWARD rule drops all pod-to-pod and pod-to-
+# internet traffic. Oracle's docs say to edit this file rather than use ufw, which removes rules
+# the boot volume depends on.
+#
+# The network security group (Terraform) stays the perimeter; this is the second layer.
+
+- name: Make sure the file still has the layout these edits expect
+  ansible.builtin.command: grep -qxF -- '-A INPUT -j REJECT --reject-with icmp-host-prohibited' /etc/iptables/rules.v4
+  changed_when: false
+
+- name: Allow web traffic, the Kubernetes API, and traffic from pods and services
+  ansible.builtin.lineinfile:
+    path: /etc/iptables/rules.v4
+    line: "{{ item }}"
+    insertbefore: '^-A INPUT -j REJECT --reject-with icmp-host-prohibited$'
+  loop:
+    - "-A INPUT -p tcp -m state --state NEW -m tcp --dport 80 -j ACCEPT"
+    - "-A INPUT -p tcp -m state --state NEW -m tcp --dport 443 -j ACCEPT"
+    - "-A INPUT -p tcp -m state --state NEW -m tcp --dport 6443 -j ACCEPT"
+    - "-A INPUT -s {{ firewall_pod_cidr }} -j ACCEPT"
+    - "-A INPUT -s {{ firewall_service_cidr }} -j ACCEPT"
+  notify: Reload host firewall
+
+- name: Let the node forward pod traffic
+  ansible.builtin.lineinfile:
+    path: /etc/iptables/rules.v4
+    regexp: '^-A FORWARD -j REJECT --reject-with icmp-host-prohibited$'
+    state: absent
+  notify: Reload host firewall

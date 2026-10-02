@@ -1,0 +1,76 @@
+{{- if .Values.redis.enabled }}
+{{- $component := dict "ctx" . "component" "redis" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "yathra.fullname" . }}-redis
+  labels:
+    {{- include "yathra.componentLabels" $component | nindent 4 }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "yathra.selectorLabels" $component | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "yathra.componentLabels" $component | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        {{- include "yathra.podSecurityContext" (dict "uid" 999 "gid" 1000) | nindent 8 }}
+      containers:
+        - name: redis
+          image: {{ .Values.redis.image }}
+          # A cache: no snapshots or append-only file, and the least recently used keys go
+          # first when it is full.
+          args:
+            - redis-server
+            - --save
+            - ""
+            - --appendonly
+            - "no"
+            - --maxmemory
+            - {{ .Values.redis.maxMemory | quote }}
+            - --maxmemory-policy
+            - allkeys-lru
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: redis
+            periodSeconds: 20
+          securityContext:
+            {{- include "yathra.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.redis.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "yathra.fullname" . }}-redis
+  labels:
+    {{- include "yathra.componentLabels" $component | nindent 4 }}
+spec:
+  selector:
+    {{- include "yathra.selectorLabels" $component | nindent 4 }}
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+{{- end }}

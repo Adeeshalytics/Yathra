@@ -1,0 +1,28 @@
+# The public site on the Oracle Cloud node. image.tag changes only through a pull request
+# (deploy/scripts/promote.sh copies the tag staging is running).
+#
+# A public demo that takes no real money, so it runs Django's staging settings: production
+# hardening, the test payment gateway, and text messages written to the log instead of sent.
+host: yathra.example.com # set to your domain (docs/devops/04-gitops.md)
+
+image:
+  tag: sha-de7229c
+
+tls:
+  enabled: true
+  # Switch to letsencrypt-prod once a staging certificate has been issued.
+  clusterIssuer: letsencrypt-staging
+
+django:
+  settingsModule: config.settings.staging
+  apiDocs: false
+
+backend:
+  workers: 3
+
+postgres:
+  storage:
+    size: 10Gi
+
+metrics:
+  enabled: true

@@ -1,0 +1,20 @@
+# {{ ansible_managed }}
+# Reference: https://docs.k3s.io/cli/server
+node-name: {{ inventory_hostname }}
+
+# Only root can read the admin kubeconfig on the node.
+write-kubeconfig-mode: "0600"
+
+# Names the API server's certificate is valid for, so kubectl works over the public address.
+tls-san:
+  - {{ public_ip }}
+
+# Encrypt Secret objects at rest in the cluster's datastore.
+secrets-encryption: true
+
+# Keep CPU and memory back for the OS and for Kubernetes itself, so a busy workload cannot
+# starve the components that keep the node alive.
+kubelet-arg:
+  - "system-reserved=cpu=200m,memory=512Mi"
+  - "kube-reserved=cpu=200m,memory=512Mi"
+  - "eviction-hard=memory.available<300Mi,nodefs.available<10%"

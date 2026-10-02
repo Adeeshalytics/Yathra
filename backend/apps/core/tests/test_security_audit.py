@@ -265,6 +265,42 @@ class TestRateLimiting:
         assert codes[:3] == [400, 400, 400]
         assert codes[3] == 429
 
+    def test_a_forged_forwarded_for_header_does_not_escape_the_limit(self, api_client, monkeypatch):
+        # With no trusted proxy configured, X-Forwarded-For is the client's own claim: a new
+        # value per request must not count as a new caller.
+        monkeypatch.setattr(SimpleRateThrottle, "THROTTLE_RATES", {"phone_code": "3/min"})
+
+        codes = [
+            api_client.post(
+                "/api/v1/auth/phone/code/",
+                {"phone": "12"},
+                format="json",
+                HTTP_X_FORWARDED_FOR=f"198.51.100.{n}",
+            ).status_code
+            for n in range(4)
+        ]
+
+        assert codes[3] == 429
+
+    def test_behind_one_proxy_the_caller_is_the_address_it_appended(self, api_client, monkeypatch):
+        monkeypatch.setattr(SimpleRateThrottle, "THROTTLE_RATES", {"phone_code": "3/min"})
+
+        def post(forwarded_for):
+            return api_client.post(
+                "/api/v1/auth/phone/code/",
+                {"phone": "12"},
+                format="json",
+                HTTP_X_FORWARDED_FOR=forwarded_for,
+            ).status_code
+
+        with override_settings(REST_FRAMEWORK={**settings.REST_FRAMEWORK, "NUM_PROXIES": 1}):
+            # The proxy appends the real address after whatever the client sent.
+            codes = [post(f"10.0.0.{n}, 203.0.113.9") for n in range(4)]
+            someone_else = post("203.0.113.10")
+
+        assert codes[3] == 429
+        assert someone_else == 400
+
     def test_seat_locking_has_its_own_limit(self):
         assert settings.SEAT_LOCK_THROTTLE_RATE
         assert settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["anon"]

@@ -145,3 +145,34 @@ class TestTheLogItself:
         assert record.getMessage() == "test.event"
         assert record.name == EVENT_LOGGER
         assert record.booking_id == "b1"
+
+
+class TestTheCallersAddress:
+    @pytest.mark.parametrize(
+        ("proxies", "forwarded_for", "expected"),
+        [
+            # No trusted proxy: the header is the client's claim and is ignored.
+            (0, "198.51.100.1", "192.0.2.50"),
+            # One proxy: the entry it appended (the last), not the client-supplied ones before it.
+            (1, "198.51.100.1, 203.0.113.9", "203.0.113.9"),
+            (1, "203.0.113.9", "203.0.113.9"),
+            # Two proxies: the one the outer proxy appended.
+            (2, "198.51.100.1, 203.0.113.9, 10.0.0.2", "203.0.113.9"),
+            # Fewer entries than proxies: the leftmost there is.
+            (2, "203.0.113.9", "203.0.113.9"),
+            # Behind a proxy but no header (a direct health check): the connection's address.
+            (1, "", "192.0.2.50"),
+        ],
+    )
+    def test_trusts_exactly_the_configured_proxies(
+        self, settings, proxies, forwarded_for, expected
+    ):
+        from django.test import RequestFactory
+
+        from apps.core.logging import client_ip
+
+        settings.TRUSTED_PROXY_COUNT = proxies
+        extra = {"HTTP_X_FORWARDED_FOR": forwarded_for} if forwarded_for else {}
+        request = RequestFactory().get("/", REMOTE_ADDR="192.0.2.50", **extra)
+
+        assert client_ip(request) == expected

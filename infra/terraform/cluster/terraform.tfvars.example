@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars (git-ignored) and fill in.
+tenancy_ocid = "ocid1.tenancy.oc1..aaaaaaaa…"
+
+# Who may reach SSH and the Kubernetes API. `make my-ip` prints your current address.
+# Home connections often change address; update this and `make apply` again when they do.
+admin_cidrs = ["203.0.113.7/32"]
+
+# Defaults, shown for reference:
+# region              = "ap-hyderabad-1"
+# ssh_public_key_path = "~/.ssh/yathra_oci.pub"
+# node_ocpus          = 2
+# node_memory_gb      = 12
+# boot_volume_gb      = 100

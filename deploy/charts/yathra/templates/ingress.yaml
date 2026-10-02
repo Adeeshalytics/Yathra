@@ -1,0 +1,48 @@
+{{- /*
+One host for everything. The API's paths go to Django; everything else to Next.js. Because the
+browser calls the API on the same origin (/api/v1), there is no CORS, the refresh cookie is
+first-party, and one frontend image works on any host name.
+*/ -}}
+{{- $api := printf "%s-api" (include "yathra.fullname" .) -}}
+{{- $web := printf "%s-web" (include "yathra.fullname" .) -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "yathra.fullname" . }}
+  labels:
+    {{- include "yathra.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.tls.clusterIssuer | quote }}
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.host | quote }}
+      secretName: {{ include "yathra.fullname" . }}-tls
+  {{- end }}
+  rules:
+    - host: {{ .Values.host | quote }}
+      http:
+        paths:
+          {{- range list "/api" "/static" (printf "/%s" (trimAll "/" .Values.django.adminPath)) }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $api }}
+                port:
+                  name: http
+          {{- end }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $web }}
+                port:
+                  name: http

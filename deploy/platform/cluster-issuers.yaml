@@ -1,0 +1,31 @@
+# Let's Encrypt, answering its HTTP-01 challenge through Traefik. Start an environment on
+# "letsencrypt-staging" (untrusted certificates, generous rate limits) and switch to
+# "letsencrypt-prod" once the staging certificate is issued — failed attempts against the
+# production endpoint are rate-limited.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-staging-account
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: traefik
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-account
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: traefik

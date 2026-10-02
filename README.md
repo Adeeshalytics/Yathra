@@ -37,13 +37,23 @@ Magiya.lk), built in phases:
   production images and scanned (Trivy, CodeQL, gitleaks); `main` publishes multi-arch images
   to GitHub Container Registry with signed build provenance. See
   [docs/devops](docs/devops/README.md).
+- **DevOps D2: infrastructure as code** — Terraform for the Oracle Cloud network and Arm node
+  (remote state, quota and budget guardrails that keep it free), Ansible to harden the server
+  and install k3s. See [docs/devops/02-iac.md](docs/devops/02-iac.md).
+- **DevOps D3: Kubernetes** — a Helm chart for the whole platform (zero-downtime rollouts,
+  migrations that cannot race the code, CloudNativePG, Sealed Secrets, the "restricted" pod
+  security profile), runnable locally with `cd deploy && make up`. See
+  [docs/devops/03-kubernetes.md](docs/devops/03-kubernetes.md).
+- **DevOps D4: GitOps** — Argo CD keeps the cluster equal to Git: every merge reaches staging
+  by itself, production moves by pull request, CI holds no cluster credentials. See
+  [docs/devops/04-gitops.md](docs/devops/04-gitops.md).
 
 | Layer    | Stack |
 |----------|-------|
 | Frontend | Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · shadcn/ui (Radix) · TanStack Query 5 · React Hook Form · Zod 4 |
 | Backend  | Django 5.2 LTS · Django REST Framework · SimpleJWT · PostgreSQL 17 · Redis 7 (cache/throttling) · drf-spectacular (OpenAPI) |
 | Tooling  | Docker Compose · pytest · ruff · ESLint · `tsc` |
-| DevOps   | GitHub Actions · GitHub Container Registry · Trivy · CodeQL · gitleaks · Dependabot |
+| DevOps   | GitHub Actions · GitHub Container Registry · Trivy · CodeQL · gitleaks · Dependabot · Terraform · Ansible · k3s · Helm · Argo CD · CloudNativePG · cert-manager · Sealed Secrets · Oracle Cloud |
 
 > "Yathra" is a working name. Change it with `APP_NAME` (backend) and `NEXT_PUBLIC_APP_NAME` (frontend).
 
@@ -299,7 +309,7 @@ Nothing secret is committed. Each app has an `.env.example`; real `.env` files a
 
 | Variable | Notes |
 |----------|-------|
-| `NEXT_PUBLIC_API_URL` | Absolute API base incl. version, e.g. `https://api.example.lk/api/v1`. Required for production builds (validated with Zod at build time). |
+| `NEXT_PUBLIC_API_URL` | API base incl. version: absolute (`https://api.example.lk/api/v1`) or a path on the same site (`/api/v1`, the Docker image's default). Validated with Zod at build time. |
 | `NEXT_PUBLIC_APP_NAME` | Display name |
 
 `NEXT_PUBLIC_*` values are embedded in the browser bundle — never put secrets in them.
@@ -985,8 +995,9 @@ payment.started · payment.captured · payment.recorded · payment.checkout_fail
 payment.amount_mismatch · refund.status_changed · admin.action
 ```
 
-A failed sign-in records the email and the caller's address but never the password; `X-Forwarded-For`
-is only believed when `TRUST_PROXY_HEADERS` says the deployment sits behind a proxy that sets it.
+A failed sign-in records the email and the caller's address but never the password. The caller's
+address — for the log and for rate limiting alike — comes from `X-Forwarded-For` only as far as
+`TRUSTED_PROXY_COUNT` proxies vouch for it; entries a client added itself are ignored.
 `apps/core/tests/test_event_logging.py` asserts each event fires with the right fields.
 
 ### Four environments, not two

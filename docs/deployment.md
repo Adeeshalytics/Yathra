@@ -11,13 +11,16 @@ stateful; the database is the only thing that must be backed up.
 # API — gunicorn, WhiteNoise, collected static files
 docker build --target production -t yathra-backend:$(git rev-parse --short HEAD) ./backend
 
-# Web — Next.js standalone server. The API URL is baked into the browser bundle at build time.
-docker build --target production \
-  --build-arg NEXT_PUBLIC_API_URL=https://api.yathra.lk/api/v1 \
-  -t yathra-frontend:$(git rev-parse --short HEAD) ./frontend
+# Web — Next.js standalone server. By default the bundle calls the API at /api/v1 on its own
+# host, so the same image works on any domain whose proxy routes /api to the backend.
+docker build --target production -t yathra-frontend:$(git rev-parse --short HEAD) ./frontend
 ```
 
-Because `NEXT_PUBLIC_API_URL` is compiled in, a different API address means a different image.
+`NEXT_PUBLIC_API_URL` is compiled into the bundle. Leave it at the default `/api/v1` and route
+`/api`, `/static` and the Django admin path to the backend (the Kubernetes ingress in
+[devops/03-kubernetes.md](devops/03-kubernetes.md) does). Pass an absolute
+`--build-arg NEXT_PUBLIC_API_URL=https://api.example.com/api/v1` only if the API must live on a
+different host — that image then works with that API only.
 
 ## 2. Configure
 
@@ -43,7 +46,7 @@ PAYHERE_MERCHANT_SECRET=…                # secret
 PAYHERE_SANDBOX=false
 JWT_REFRESH_COOKIE_DOMAIN=.yathra.lk
 DJANGO_LOG_FORMAT=json
-TRUST_PROXY_HEADERS=true
+TRUSTED_PROXY_COUNT=1                    # one reverse proxy / load balancer in front
 ```
 
 Serve the app and API as **sibling subdomains** (`yathra.lk` and `api.yathra.lk`) so the refresh
@@ -115,7 +118,7 @@ Set by `config/settings/production.py`, no action needed:
 
 The web container adds its own headers (`next.config.ts`): a Content-Security-Policy that allows
 scripts and styles only from the app itself, blocks framing and plugins, and permits API calls
-only to `NEXT_PUBLIC_API_URL`.
+only to its own origin (or to `NEXT_PUBLIC_API_URL`'s origin when that is an absolute URL).
 
 ## 7. Before you go live
 

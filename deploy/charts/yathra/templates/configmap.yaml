@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "yathra.fullname" . }}-config
+  labels:
+    {{- include "yathra.labels" . | nindent 4 }}
+data:
+  # Everything non-secret the API reads (docs/environment.md). Secrets come from
+  # the {{ .Values.django.secretName }} Secret and the database's own Secret.
+  DJANGO_SETTINGS_MODULE: {{ .Values.django.settingsModule | quote }}
+  DJANGO_ALLOWED_HOSTS: {{ .Values.host | quote }}
+  CSRF_TRUSTED_ORIGINS: {{ include "yathra.origin" . | quote }}
+  FRONTEND_URL: {{ include "yathra.origin" . | quote }}
+  PUBLIC_API_URL: {{ include "yathra.origin" . | quote }}
+  DJANGO_ADMIN_URL: {{ printf "%s/" (trimAll "/" .Values.django.adminPath) | quote }}
+  DJANGO_SECURE_SSL_REDIRECT: {{ .Values.tls.enabled | quote }}
+  JWT_REFRESH_COOKIE_SECURE: {{ .Values.tls.enabled | quote }}
+  TRUSTED_PROXY_COUNT: {{ .Values.django.trustedProxyCount | quote }}
+  PAYMENT_PROVIDERS: {{ .Values.django.paymentProviders | quote }}
+  SMS_BACKEND: {{ .Values.django.smsBackend | quote }}
+  API_DOCS_ENABLED: {{ .Values.django.apiDocs | quote }}
+  DJANGO_LOG_FORMAT: {{ .Values.django.logFormat | quote }}
+  DJANGO_LOG_LEVEL: {{ .Values.django.logLevel | quote }}
+  {{- if .Values.redis.enabled }}
+  REDIS_URL: {{ printf "redis://%s-redis:6379/0" (include "yathra.fullname" .) | quote }}
+  {{- end }}
+  {{- range $name, $value := .Values.django.extraEnv }}
+  {{ $name }}: {{ $value | quote }}
+  {{- end }}

@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Yathra chart values",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["host", "image", "tls", "django", "backend", "frontend", "postgres", "redis"],
+  "properties": {
+    "host": {
+      "description": "Public host name of the site.",
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registry", "tag"],
+      "properties": {
+        "registry": { "type": "string", "minLength": 1 },
+        "tag": {
+          "description": "sha-<commit> as published by CI (empty only in the chart defaults).",
+          "type": "string",
+          "pattern": "^([a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127})?$"
+        },
+        "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": { "name": { "type": "string" } }
+      }
+    },
+    "tls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "clusterIssuer": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "className": { "type": "string" },
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "django": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["settingsModule", "secretName"],
+      "properties": {
+        "settingsModule": { "enum": ["config.settings.staging", "config.settings.production"] },
+        "adminPath": { "type": "string", "pattern": "^[a-zA-Z0-9_-]+$" },
+        "secretName": { "type": "string", "minLength": 1 },
+        "sealedSecret": {
+          "description": "encryptedData of the SealedSecret, from deploy/scripts/new-app-secret.sh.",
+          "type": "object",
+          "propertyNames": { "pattern": "^[A-Z][A-Z0-9_]*$" },
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "trustedProxyCount": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "paymentProviders": { "type": "string" },
+        "smsBackend": { "enum": ["", "console", "notifylk"] },
+        "apiDocs": { "type": "boolean" },
+        "logFormat": { "enum": ["console", "json"] },
+        "logLevel": { "enum": ["DEBUG", "INFO", "WARNING", "ERROR"] },
+        "extraEnv": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[A-Z][A-Z0-9_]*$" },
+          "additionalProperties": { "type": ["string", "number", "boolean"] }
+        }
+      }
+    },
+    "backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "replicas": { "type": "integer", "minimum": 1 },
+        "workers": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "resources": { "$ref": "#/definitions/resources" }
+      }
+    },
+    "frontend": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "replicas": { "type": "integer", "minimum": 1 },
+        "resources": { "$ref": "#/definitions/resources" }
+      }
+    },
+    "migrations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "backoffLimit": { "type": "integer", "minimum": 0 },
+        "activeDeadlineSeconds": { "type": "integer", "minimum": 60 },
+        "ttlSecondsAfterFinished": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "cronJobs": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["schedule", "command"],
+        "properties": {
+          "schedule": { "type": "string", "minLength": 9 },
+          "command": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "suspend": { "type": "boolean" },
+          "resources": { "$ref": "#/definitions/resources" }
+        }
+      }
+    },
+    "cronJobDefaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "suspend": { "type": "boolean" },
+        "resources": { "$ref": "#/definitions/resources" }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "alertLabels": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "postgres": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "instances": { "type": "integer", "minimum": 1 },
+        "image": { "type": "string", "minLength": 1 },
+        "storage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "size": { "type": "string", "pattern": "^[0-9]+(Mi|Gi|Ti)$" },
+            "storageClass": { "type": "string" }
+          }
+        },
+        "resources": { "$ref": "#/definitions/resources" },
+        "parameters": { "type": "object", "additionalProperties": { "type": "string" } },
+        "external": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "secretName": { "type": "string" },
+            "secretKey": { "type": "string" }
+          }
+        }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": { "type": "string", "minLength": 1 },
+        "maxMemory": { "type": "string", "pattern": "^[0-9]+(kb|mb|gb)$" },
+        "resources": { "$ref": "#/definitions/resources" }
+      }
+    }
+  },
+  "definitions": {
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requests": { "type": "object" },
+        "limits": { "type": "object" }
+      }
+    }
+  }
+}

@@ -1,0 +1,128 @@
+{{- $component := dict "ctx" . "component" "api" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "yathra.fullname" . }}-api
+  labels:
+    {{- include "yathra.componentLabels" $component | nindent 4 }}
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  revisionHistoryLimit: 3
+  strategy:
+    # Start the new pod and wait until it is ready before stopping an old one.
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "yathra.selectorLabels" $component | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "yathra.componentLabels" $component | nindent 8 }}
+      annotations:
+        {{- include "yathra.configChecksum" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "yathra.podSecurityContext" (dict "uid" 999 "gid" 999) | nindent 8 }}
+      initContainers:
+        # The migration Job applies the schema; new API pods wait for it, so they never serve
+        # requests against a database that is behind their code. Old pods keep serving meanwhile.
+        {{- include "yathra.waitForMigrations" . | nindent 8 }}
+      containers:
+        - name: api
+          image: {{ include "yathra.image" (dict "ctx" . "name" "backend") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - gunicorn
+            - config.wsgi:application
+            - --config=python:config.gunicorn
+            - --bind=0.0.0.0:8000
+            - --workers={{ .Values.backend.workers }}
+            # Heartbeat files live on the writable /tmp volume (the root filesystem is read-only).
+            - --worker-tmp-dir=/tmp
+            - --timeout=60
+            - --graceful-timeout=25
+          ports:
+            - name: http
+              containerPort: 8000
+          {{- include "yathra.backendEnv" . | nindent 10 }}
+            # Prometheus scrapes the pod by its IP address, which Django must accept as a host.
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: DJANGO_ALLOWED_HOSTS
+              value: {{ printf "%s,$(POD_IP)" .Values.host | quote }}
+            # gunicorn's workers pool their metrics here (config/gunicorn.py).
+            - name: PROMETHEUS_MULTIPROC_DIR
+              value: /tmp/prometheus
+          # The kubelet calls probes with the pod's IP as the Host header, which Django's
+          # ALLOWED_HOSTS would reject — so the probes present the site's host name.
+          startupProbe:
+            httpGet:
+              path: /api/v1/health/live/
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: {{ .Values.host | quote }}
+            periodSeconds: 2
+            timeoutSeconds: 3
+            failureThreshold: 60
+          livenessProbe:
+            # Liveness checks the process only: a database outage must not restart every pod.
+            httpGet:
+              path: /api/v1/health/live/
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: {{ .Values.host | quote }}
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            # Readiness checks the database and cache: no traffic while they are unreachable.
+            httpGet:
+              path: /api/v1/health/
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: {{ .Values.host | quote }}
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          lifecycle:
+            # Give the ingress a moment to stop routing here before gunicorn starts shutting down.
+            preStop:
+              sleep:
+                seconds: 5
+          securityContext:
+            {{- include "yathra.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "yathra.fullname" . }}-api
+  labels:
+    {{- include "yathra.componentLabels" $component | nindent 4 }}
+spec:
+  selector:
+    {{- include "yathra.selectorLabels" $component | nindent 4 }}
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

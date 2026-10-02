@@ -1,0 +1,9 @@
+timezone: Asia/Colombo
+
+# Pinned on purpose: an upgrade is a change in this file, reviewed and applied like any other.
+# Channels and versions: https://update.k3s.io/v1-release/channels
+k3s_version: v1.36.5+k3s1
+
+# Where the admin kubeconfig is written on the machine running Ansible.
+k3s_local_kubeconfig: "~/.kube/yathra.yaml"
+k3s_context_name: yathra

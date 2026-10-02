@@ -1,0 +1,10 @@
+- name: Reload host firewall
+  # iptables-restore replaces the whole filter table, including the chains k3s maintains,
+  # so k3s is restarted afterwards to rebuild them.
+  ansible.builtin.shell: iptables-restore < /etc/iptables/rules.v4
+  changed_when: true
+  notify: Restart k3s if it is installed
+
+- name: Restart k3s if it is installed
+  ansible.builtin.shell: if systemctl is-enabled --quiet k3s 2>/dev/null; then systemctl restart k3s; fi
+  changed_when: true

@@ -17,7 +17,9 @@ export interface RequestOptions extends Omit<RequestInit, "body" | "credentials"
 }
 
 export function buildUrl(path: string, query?: Record<string, QueryValue>): string {
-  const url = new URL(`${env.NEXT_PUBLIC_API_URL}/${path.replace(/^\/+/, "")}`);
+  // A path-only API base (/api/v1) resolves against the page's own origin.
+  const origin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+  const url = new URL(`${env.NEXT_PUBLIC_API_URL}/${path.replace(/^\/+/, "")}`, origin);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== undefined && value !== null && value !== "") {
       url.searchParams.set(key, String(value));

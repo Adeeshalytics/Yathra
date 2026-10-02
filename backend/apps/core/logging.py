@@ -49,15 +49,17 @@ class JSONFormatter(logging.Formatter):
 
 def client_ip(request) -> str:
     """
-    The caller's address for security logs. X-Forwarded-For is only believed when the
-    deployment says it sits behind a trusted proxy, since clients can forge that header.
+    The caller's address for security logs, worked out the same way as for rate limiting:
+    behind N trusted proxies it is entry -N of X-Forwarded-For (the one the outermost trusted
+    proxy appended). Entries further left come from the client and can be forged.
     """
     from django.conf import settings
 
-    if getattr(settings, "TRUST_PROXY_HEADERS", False):
-        forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
-        if forwarded:
-            return forwarded.split(",")[0].strip()[:45]
+    proxies = getattr(settings, "TRUSTED_PROXY_COUNT", 0)
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if proxies > 0 and forwarded:
+        addresses = forwarded.split(",")
+        return addresses[-min(proxies, len(addresses))].strip()[:45]
     return (request.META.get("REMOTE_ADDR") or "")[:45]
 
 
@@ -74,5 +76,9 @@ def log_event(event: str, /, *, level: int = logging.INFO, **fields) -> None:
     with logging own attributes are dropped rather than blowing up at the call site. Values are
     rendered by the formatter, so ids can be passed as they are.
     """
+    from .metrics import EVENTS
+
     safe = {key: value for key, value in fields.items() if key not in _STANDARD_ATTRS}
     logging.getLogger(EVENT_LOGGER).log(level, event, extra={"event": event, **safe})
+    # Event names are a fixed set written in the code, so they are safe as a metric label.
+    EVENTS.labels(event=event).inc()

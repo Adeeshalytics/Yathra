@@ -1,0 +1,58 @@
+{{- range $name, $job := .Values.cronJobs }}
+{{- $component := dict "ctx" $ "component" (printf "job-%s" $name) }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ printf "%s-%s" (include "yathra.fullname" $) $name | trunc 52 | trimSuffix "-" }}
+  labels:
+    {{- include "yathra.componentLabels" $component | nindent 4 }}
+spec:
+  schedule: {{ $job.schedule | quote }}
+  timeZone: Asia/Colombo
+  suspend: {{ $job.suspend | default $.Values.cronJobDefaults.suspend }}
+  # Never two runs of the same command at once; a run that cannot start within a minute of
+  # its slot is skipped rather than piling up.
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 60
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 300
+      ttlSecondsAfterFinished: 600
+      template:
+        metadata:
+          labels:
+            {{- include "yathra.componentLabels" $component | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          {{- with $.Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- include "yathra.podSecurityContext" (dict "uid" 999 "gid" 999) | nindent 12 }}
+          # During a release the schedule can fire before the migration Job has finished.
+          initContainers:
+            {{- include "yathra.waitForMigrations" $ | nindent 12 }}
+          containers:
+            - name: {{ $name }}
+              image: {{ include "yathra.image" (dict "ctx" $ "name" "backend") }}
+              imagePullPolicy: {{ $.Values.image.pullPolicy }}
+              command: {{ concat (list "python" "manage.py") $job.command | toJson }}
+              {{- include "yathra.backendEnv" $ | nindent 14 }}
+              securityContext:
+                {{- include "yathra.containerSecurityContext" $ | nindent 16 }}
+              resources:
+                {{- toYaml ($job.resources | default $.Values.cronJobDefaults.resources) | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir:
+                sizeLimit: 64Mi
+{{- end }}

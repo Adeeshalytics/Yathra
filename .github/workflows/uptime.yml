@@ -1,0 +1,50 @@
+# An outside view of the sites. Prometheus runs on the same server as the app, so if the server
+# goes down, so do its alerts. This runs on GitHub's machines instead: every 15 minutes it asks
+# each environment's health endpoint over the internet, and a failed run makes GitHub e-mail you.
+# Free on public repositories. See docs/devops/05-observability.md.
+
+name: Uptime
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Health check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: deploy/environments
+
+      - name: Check each environment from the internet
+        run: |
+          status=0
+          for env in production staging; do
+            values="deploy/environments/$env/values.yaml"
+            host=$(sed -n 's/^host: *\([^ #]*\).*/\1/p' "$values")
+            case "$host" in
+              "" | *example.com)
+                echo "::notice::$env has no real host name yet; skipped."
+                continue ;;
+            esac
+            # Let's Encrypt's staging certificates are deliberately untrusted.
+            insecure=""
+            grep -q "clusterIssuer: letsencrypt-staging" "$values" && insecure="--insecure"
+            url="https://$host/api/v1/health/"
+            if curl --fail --silent --show-error $insecure --max-time 15 \
+                 --retry 3 --retry-delay 10 --retry-all-errors --output /dev/null "$url"; then
+              echo "$env is up: $url"
+            else
+              echo "::error title=$env is down::$url did not answer with 200 after 4 attempts."
+              status=1
+            fi
+          done
+          exit $status

@@ -1,0 +1,33 @@
+crds:
+  enabled: true
+  # Keep the CRDs (and with them every Certificate) if the chart is ever uninstalled.
+  keep: true
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    memory: 128Mi
+
+webhook:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
+
+cainjector:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+# Certificate expiry metrics for Prometheus (the Yathra chart alerts on them).
+prometheus:
+  enabled: true
+  servicemonitor:
+    enabled: true

@@ -1,0 +1,138 @@
+# Defaults for one Yathra environment. Each environment overrides what differs in
+# deploy/environments/<name>/values.yaml. See docs/devops/03-kubernetes.md.
+
+# Public host name. The ingress, Django's ALLOWED_HOSTS and CSRF origins, and the URLs payment
+# gateways return to and post notifications to are all derived from it.
+host: yathra.localhost
+
+image:
+  registry: ghcr.io/adeeshalytics
+  # Shared by yathra-backend and yathra-frontend: CI publishes both as sha-<commit>. Required.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+tls:
+  # Serve HTTPS with a certificate from cert-manager. Off for a local cluster on plain HTTP.
+  enabled: false
+  clusterIssuer: letsencrypt-staging
+
+ingress:
+  className: traefik
+  annotations: {}
+
+django:
+  # Staging settings: production hardening, but the test payment gateway and logged (not sent)
+  # text messages are allowed — right for a public demo that takes no real money.
+  settingsModule: config.settings.staging
+  # Where the Django admin is mounted (no slashes). The ingress routes it to the API.
+  adminPath: django-admin
+  # Secret with DJANGO_SECRET_KEY and MOCK_PAYMENT_SECRET (plus EMAIL_URL, PAYHERE_* when used).
+  secretName: yathra-app
+  # Its values encrypted for one cluster by deploy/scripts/new-app-secret.sh (safe to commit).
+  # When set, the chart creates the SealedSecret; when empty, the Secret must already exist
+  # (`make secret` on a local cluster).
+  sealedSecret: {}
+  # One reverse proxy (Traefik) appends to X-Forwarded-For in front of the app.
+  trustedProxyCount: 1
+  paymentProviders: mock
+  smsBackend: console
+  apiDocs: true
+  logFormat: json
+  logLevel: INFO
+  # Any further non-secret environment variables (docs/environment.md).
+  extraEnv: {}
+
+backend:
+  replicas: 1
+  # gunicorn worker processes; each is a full copy of the app (~120 MB).
+  workers: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+frontend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+# Runs `manage.py migrate` once per image tag. API pods wait for it before they start.
+migrations:
+  backoffLimit: 10
+  activeDeadlineSeconds: 900
+  ttlSecondsAfterFinished: 86400
+
+# The management commands that keep bookings and payments moving (docs/deployment.md).
+cronJobs:
+  expire-seat-holds:
+    schedule: "* * * * *"
+    command: [expire_seat_holds]
+  send-notifications:
+    schedule: "* * * * *"
+    command: [send_notifications]
+  reconcile-payments:
+    schedule: "*/5 * * * *"
+    command: [reconcile_payments]
+  refresh-route-paths:
+    schedule: "17 * * * *"
+    command: [refresh_route_paths]
+
+cronJobDefaults:
+  suspend: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+metrics:
+  # Prometheus scraping (API and database), alert rules and the Grafana dashboard. Needs the
+  # monitoring stack (deploy/platform: kube-prometheus-stack), whose CRDs these objects are.
+  enabled: false
+  # Extra labels on every alert from this environment, e.g. to route production differently.
+  alertLabels: {}
+
+postgres:
+  # A CloudNativePG Cluster (the operator is a platform component: deploy/platform).
+  enabled: true
+  instances: 1
+  # PostgreSQL 17 — the same major version as docker-compose.yml and CI. From
+  # https://github.com/cloudnative-pg/artifacts/blob/main/image-catalogs/catalog-standard-trixie.yaml
+  image: ghcr.io/cloudnative-pg/postgresql:17.11-202609281634-standard-trixie@sha256:db440678e1eca4f53999f819a6200ceb4b8cd2339c568c9bb0596052d3bc4ac5
+  storage:
+    size: 5Gi
+    storageClass: "" # cluster default (k3s: local-path)
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  parameters:
+    shared_buffers: 128MB
+    max_connections: "50"
+  # With postgres.enabled=false, read DATABASE_URL from this Secret instead.
+  external:
+    secretName: ""
+    secretKey: uri
+
+redis:
+  # Cache and rate-limit counters only: nothing in it needs to survive a restart.
+  enabled: true
+  image: docker.io/library/redis:7.4-alpine
+  maxMemory: 64mb
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      memory: 128Mi

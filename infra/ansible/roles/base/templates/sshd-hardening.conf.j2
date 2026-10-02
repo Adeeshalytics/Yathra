@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+# Loaded before 50-cloud-init.conf; for each setting sshd uses the first value it reads.
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+AuthenticationMethods publickey
+X11Forwarding no
+AllowAgentForwarding no
+MaxAuthTries 3
+LoginGraceTime 30
+AllowUsers {{ ansible_user | default('ubuntu') }}

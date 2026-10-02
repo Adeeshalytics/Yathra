@@ -29,7 +29,8 @@ Which settings module reads them is chosen by `DJANGO_SETTINGS_MODULE`:
 | `DJANGO_ALLOWED_HOSTS` | empty | **yes in prod** | Comma-separated host names the API answers on. |
 | `DJANGO_ADMIN_URL` | `django-admin/` | no | Where the Django admin is mounted. Change it in production. |
 | `APP_NAME` | `Yathra` | no | Shown in the Django admin and used in file names. |
-| `TRUST_PROXY_HEADERS` | `false` | no | Believe `X-Forwarded-For` when logging the caller's address. Only behind a proxy that overwrites it. |
+| `TRUSTED_PROXY_COUNT` | `0` | **yes behind a proxy** | How many reverse proxies append to `X-Forwarded-For` in front of the app. The caller is the entry the outermost one appended; everything left of it is client-supplied and ignored. Used for rate limiting and the security log. `0` uses the connection's address. Behind the Kubernetes ingress: `1`. |
+| `TRUST_PROXY_HEADERS` | `false` | no | Older switch: `true` means `TRUSTED_PROXY_COUNT=1`. |
 
 ## Data stores
 
@@ -163,7 +164,7 @@ must never hold a secret.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000/api/v1` | API base URL including the version. Also becomes the `connect-src` of the Content-Security-Policy. |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000/api/v1` in development, `/api/v1` in the Docker image | API base including the version: an absolute URL (API on another host; its origin becomes the CSP `connect-src`) or a path on the same site (API routed under `/api` by the ingress — one image works on any domain). |
 | `NEXT_PUBLIC_APP_NAME` | `Yathra` | Product name in the interface. |
 | `NEXT_PUBLIC_MAP_TILE_URL` | OpenStreetMap | Leaflet tile URL. Its host must also be allowed by the CSP in `next.config.ts` (which derives it from this value). |
 | `NEXT_PUBLIC_MAP_TILE_ATTRIBUTION` | OpenStreetMap credit | Shown on every map. Required by the tile licence — see [route-maps.md](route-maps.md). |

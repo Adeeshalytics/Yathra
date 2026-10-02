@@ -5,6 +5,10 @@
 # cooldown: a brand-new release waits a few days before Dependabot proposes it. Most malicious
 # package releases are found and pulled within days, so this keeps them out of the project.
 # (Security updates ignore the cooldown.)
+#
+# Major versions are held back (ignore: semver-major) for the application stack: Django stays on
+# its LTS line, Node on its LTS line, and a Postgres major needs a data migration, not a tag bump.
+# Major upgrades are planned as their own pieces of work instead of arriving as a weekly PR.
 
 version: 2
 
@@ -21,6 +25,9 @@ updates:
       python-minor-and-patch:
         update-types: [minor, patch]
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directories: ["/frontend"]
@@ -37,6 +44,9 @@ updates:
       npm-minor-and-patch:
         update-types: [minor, patch]
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # Base images in the Dockerfiles (python:3.13-slim, node:24-alpine).
   - package-ecosystem: docker
@@ -45,6 +55,9 @@ updates:
       interval: weekly
       day: monday
       timezone: Asia/Colombo
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # postgres and redis in docker-compose.yml.
   - package-ecosystem: docker-compose
@@ -53,6 +66,25 @@ updates:
       interval: weekly
       day: monday
       timezone: Asia/Colombo
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # Provider versions in the Terraform lock files (infra/terraform).
+  - package-ecosystem: terraform
+    directories: ["/infra/terraform/bootstrap", "/infra/terraform/cluster"]
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Colombo
+    cooldown:
+      default-days: 5
+    groups:
+      terraform-providers:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # The pinned action SHAs in .github/workflows (Dependabot updates the "# vX.Y.Z" comment too).
   - package-ecosystem: github-actions

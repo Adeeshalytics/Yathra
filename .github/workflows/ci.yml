@@ -8,7 +8,8 @@
 #   push to main ── all of the above, then
 #                 build (2 images × amd64/arm64, native runners) → publish (multi-arch
 #                 manifest on ghcr.io, tagged sha-<commit> and latest, with a signed
-#                 build-provenance attestation)
+#                 build-provenance attestation) → deploy-staging (commits the new tag to
+#                 deploy/environments/staging; Argo CD rolls it out)
 #
 # Third-party actions are pinned to a full commit SHA (the tag is in the comment): a tag can
 # be moved to malicious code, a commit cannot. Dependabot keeps the pins up to date.
@@ -34,9 +35,10 @@ permissions:
 env:
   PYTHON_VERSION: "3.13" # matches python:3.13-slim in backend/Dockerfile
   NODE_VERSION: "24" # matches node:24-alpine in frontend/Dockerfile
-  # NEXT_PUBLIC_* values are compiled into the browser bundle. Until the app is deployed
-  # (docs/devops/01-ci.md, "One image, many environments") the image points at a local API.
-  NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1' }}
+  # NEXT_PUBLIC_* values are compiled into the browser bundle. A path, not a host: the ingress
+  # serves the API under /api on whatever domain the site is on, so one image fits every
+  # environment (docs/devops/03-kubernetes.md).
+  NEXT_PUBLIC_API_URL: /api/v1
 
 jobs:
   backend:
@@ -388,3 +390,58 @@ jobs:
           subject-digest: ${{ steps.manifest.outputs.digest }}
           push-to-registry: true
           create-storage-record: false # storage records exist for organization repositories only
+
+  # ---- Continuous delivery: staging follows main ---------------------------------------------
+  #
+  # GitOps: CI never talks to the cluster. It records the new image tag in Git, and Argo CD
+  # (watching Git) rolls it out. The commit is pushed with a deploy key, which the main-branch
+  # ruleset lets through; "[skip ci]" stops it from triggering another build.
+
+  deploy-staging:
+    name: Deploy to staging
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # One tag change at a time; a newer one waits instead of racing on the same file.
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    env:
+      DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+    steps:
+      - name: Check for the deploy key
+        id: key
+        run: |
+          if [ -z "$DEPLOY_KEY" ]; then
+            echo "::notice title=Staging not updated::Add the DEPLOY_KEY repository secret so CI can commit new image tags (docs/devops/04-gitops.md)."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.key.outputs.present == 'true'
+        with:
+          ref: main
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+
+      - name: Point staging at the new image
+        if: steps.key.outputs.present == 'true'
+        run: |
+          tag="sha-${GITHUB_SHA::7}"
+          file=deploy/environments/staging/values.yaml
+          # Rewrite only the tag, keeping the file's comments and layout.
+          sed -i -E "s/^(  tag: )[^ #]+/\1${tag}/" "$file"
+          if git diff --quiet; then
+            echo "Staging already runs $tag"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --quiet -am "deploy(staging): $tag [skip ci]"
+          for attempt in 1 2 3; do
+            git push origin HEAD:main && break
+            [ "$attempt" = 3 ] && exit 1
+            git pull --rebase origin main
+          done
+          echo "### Staging → \`$tag\`" >> "$GITHUB_STEP_SUMMARY"

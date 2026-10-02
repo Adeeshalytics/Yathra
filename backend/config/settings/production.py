@@ -23,17 +23,20 @@ if SMS["BACKEND"] in ("console", "locmem") and not env.bool("ALLOW_CONSOLE_SMS",
     )
 
 # WhiteNoise serves the collected static files (Django admin assets) straight from gunicorn.
+# It belongs directly after SecurityMiddleware.
+_after_security = MIDDLEWARE.index("django.middleware.security.SecurityMiddleware") + 1
 MIDDLEWARE = [
-    MIDDLEWARE[0],  # SecurityMiddleware must stay first
+    *MIDDLEWARE[:_after_security],
     "whitenoise.middleware.WhiteNoiseMiddleware",
-    *MIDDLEWARE[1:],
+    *MIDDLEWARE[_after_security:],
 ]
 
 # Behind a TLS-terminating proxy / load balancer.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = env.bool("DJANGO_SECURE_SSL_REDIRECT", default=True)
-# Health checks from the load balancer usually arrive over plain HTTP.
-SECURE_REDIRECT_EXEMPT = [r"^api/v1/health/$", r"^api/v1/health/live/$"]
+# Health checks from the load balancer, and Prometheus scraping a pod directly, arrive over
+# plain HTTP.
+SECURE_REDIRECT_EXEMPT = [r"^api/v1/health/$", r"^api/v1/health/live/$", r"^metrics$"]
 
 SECURE_HSTS_SECONDS = env.int("DJANGO_SECURE_HSTS_SECONDS", default=60 * 60 * 24 * 30)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True)

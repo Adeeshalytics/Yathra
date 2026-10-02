@@ -1,0 +1,37 @@
+# Production: changes only when a pull request that edits
+# deploy/environments/production/values.yaml is merged (deploy/scripts/promote.sh opens one).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: yathra-production
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: yathra
+  sources:
+    - repoURL: https://github.com/Adeeshalytics/Yathra.git
+      targetRevision: main
+      path: deploy/charts/yathra
+      helm:
+        releaseName: yathra
+        valueFiles:
+          - ../../environments/production/values.yaml
+          - ../../environments/production/secrets.yaml
+        ignoreMissingValueFiles: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: yathra-production
+  syncPolicy:
+    automated:
+      # Never delete anything in production automatically: an object that disappears from
+      # Git (the database, say) stays until someone removes it on purpose.
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: restricted
+        pod-security.kubernetes.io/warn: restricted

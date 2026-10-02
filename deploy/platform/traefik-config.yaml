@@ -1,0 +1,25 @@
+# Settings for the Traefik ingress controller k3s installs (chart v40, Traefik 3.7). k3s merges
+# this into its own Helm release; do not install Traefik separately.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    service:
+      spec:
+        # Deliver traffic to Traefik without rewriting the source address, so the client's real
+        # IP reaches X-Forwarded-For — the API rate-limits per address (TRUSTED_PROXY_COUNT=1).
+        externalTrafficPolicy: Local
+    ports:
+      web:
+        # Everything on plain HTTP is redirected to HTTPS, except Let's Encrypt's challenge
+        # requests, which must be answered over HTTP.
+        allowACMEByPass: true
+        http:
+          redirections:
+            entryPoint:
+              to: websecure
+              scheme: https
+              permanent: true
