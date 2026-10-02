@@ -44,13 +44,16 @@ Magiya.lk), built in phases:
   migrations that cannot race the code, CloudNativePG, Sealed Secrets, the "restricted" pod
   security profile), runnable locally with `cd deploy && make up`. See
   [docs/devops/03-kubernetes.md](docs/devops/03-kubernetes.md).
+- **DevOps D4: GitOps** — Argo CD keeps the cluster equal to Git: every merge reaches staging
+  by itself, production moves by pull request, CI holds no cluster credentials. See
+  [docs/devops/04-gitops.md](docs/devops/04-gitops.md).
 
 | Layer    | Stack |
 |----------|-------|
 | Frontend | Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · shadcn/ui (Radix) · TanStack Query 5 · React Hook Form · Zod 4 |
 | Backend  | Django 5.2 LTS · Django REST Framework · SimpleJWT · PostgreSQL 17 · Redis 7 (cache/throttling) · drf-spectacular (OpenAPI) |
 | Tooling  | Docker Compose · pytest · ruff · ESLint · `tsc` |
-| DevOps   | GitHub Actions · GitHub Container Registry · Trivy · CodeQL · gitleaks · Dependabot · Terraform · Ansible · k3s · Helm · CloudNativePG · cert-manager · Sealed Secrets · Oracle Cloud |
+| DevOps   | GitHub Actions · GitHub Container Registry · Trivy · CodeQL · gitleaks · Dependabot · Terraform · Ansible · k3s · Helm · Argo CD · CloudNativePG · cert-manager · Sealed Secrets · Oracle Cloud |
 
 > "Yathra" is a working name. Change it with `APP_NAME` (backend) and `NEXT_PUBLIC_APP_NAME` (frontend).
 
