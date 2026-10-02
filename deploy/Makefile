@@ -19,7 +19,7 @@ REGISTRY := ghcr.io/adeeshalytics
 TAG := local
 SEED_PASSWORD ?=
 
-.PHONY: load-test help up up-gitops grafana argocd-ui cluster platform images namespace secret deploy seed status open down template
+.PHONY: object-store restore-drill load-test help up up-gitops grafana argocd-ui cluster platform images namespace secret deploy seed status open down template
 
 help: ## List the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -87,6 +87,16 @@ status: ## Pods, jobs, database and ingress at a glance
 template: ## Render the chart with the local values (no cluster needed)
 	helm template $(RELEASE) charts/yathra --namespace $(NAMESPACE) \
 	  --values environments/local/values.yaml --set image.tag=$(TAG)
+
+object-store: ## A local S3-compatible store (RustFS) for database backups, with its credentials
+	kubectl apply -f local/object-store.yaml
+	kubectl -n object-store rollout status deploy/rustfs --timeout=5m
+	kubectl -n $(NAMESPACE) create secret generic yathra-backup-credentials \
+	  --from-literal=ACCESS_KEY_ID=local-backups --from-literal=ACCESS_SECRET_KEY=local-backups-not-a-secret \
+	  --dry-run=client -o yaml | kubectl apply -f -
+
+restore-drill: ## Back up the database, restore it into a new cluster, compare every table
+	bash scripts/restore-drill.sh $(NAMESPACE)
 
 VUS ?= 20
 HOLD ?= 2m

@@ -141,6 +141,20 @@ postgres:
     secretName: ""
     secretKey: uri
 
+backup:
+  # Continuous WAL archiving and scheduled base backups of PostgreSQL to S3-compatible object
+  # storage (Oracle Object Storage, RustFS locally), via CloudNativePG's Barman Cloud plugin.
+  enabled: false
+  destinationPath: "" # s3://<bucket>/<environment>
+  endpointURL: "" # empty for AWS; Oracle: https://<namespace>.compat.objectstorage.<region>.oraclecloud.com
+  region: "" # set to read REGION from the credentials Secret (Oracle needs it)
+  # Secret with ACCESS_KEY_ID and ACCESS_SECRET_KEY (and REGION). sealedCredentials creates it
+  # from values sealed for this cluster; otherwise it must exist.
+  credentialsSecret: yathra-backup-credentials
+  sealedCredentials: {}
+  retention: 7d
+  schedule: "0 30 20 * * *" # 02:00 Sri Lanka time (the operator's clock is UTC)
+
 redis:
   # Cache and rate-limit counters only: nothing in it needs to survive a restart.
   enabled: true

@@ -10,3 +10,4 @@ resources:
   - cloudnative-pg.yaml
   - sealed-secrets.yaml
   - cluster-issuers.yaml
+  - barman-cloud.yaml

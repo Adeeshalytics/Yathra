@@ -181,6 +181,20 @@
         }
       }
     },
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "destinationPath": { "type": "string", "pattern": "^(s3://.+)?$" },
+        "endpointURL": { "type": "string" },
+        "region": { "type": "string" },
+        "credentialsSecret": { "type": "string", "minLength": 1 },
+        "sealedCredentials": { "type": "object", "additionalProperties": { "type": "string" } },
+        "retention": { "type": "string", "pattern": "^[0-9]+[dwm]$" },
+        "schedule": { "type": "string", "minLength": 11 }
+      }
+    },
     "redis": {
       "type": "object",
       "additionalProperties": false,

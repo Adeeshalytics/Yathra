@@ -1,0 +1,29 @@
+# CloudNativePG's backup plugin: streams each database's WAL and base backups to object storage.
+# After cert-manager (which issues its TLS certificates) and the operator.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: barman-cloud
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: platform
+  sources:
+    - repoURL: https://github.com/Adeeshalytics/Yathra.git
+      targetRevision: main
+      ref: repo
+    - repoURL: https://cloudnative-pg.github.io/charts
+      chart: plugin-barman-cloud
+      targetRevision: 0.8.1 # plugin v0.15.1
+      helm:
+        releaseName: barman-cloud
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cnpg-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

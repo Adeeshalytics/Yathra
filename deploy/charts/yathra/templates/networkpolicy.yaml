@@ -88,9 +88,12 @@ metadata:
   labels:
     {{- include "yathra.labels" . | nindent 4 }}
 spec:
+  # Every CloudNativePG instance in the namespace: the environment's database, and a cluster
+  # restored from its backups by the restore drill.
   podSelector:
-    matchLabels:
-      cnpg.io/cluster: {{ $db }}
+    matchExpressions:
+      - key: cnpg.io/cluster
+        operator: Exists
   policyTypes: [Ingress]
   ingress:
     - from:
@@ -98,8 +101,9 @@ spec:
             matchLabels:
               app.kubernetes.io/part-of: yathra
         - podSelector:
-            matchLabels:
-              cnpg.io/cluster: {{ $db }}
+            matchExpressions:
+              - key: cnpg.io/cluster
+                operator: Exists
       ports:
         - port: 5432
     - from:

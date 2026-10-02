@@ -29,3 +29,11 @@ backend:
   # Proven here with `make load-test VUS=80`: more API pods under load, back to one after.
   autoscaling:
     enabled: true
+
+backup:
+  enabled: true
+  # The RustFS store from deploy/local/object-store.yaml; `make backup-secret` creates the
+  # credentials Secret.
+  destinationPath: s3://yathra-backups/local
+  endpointURL: http://rustfs.object-store:9000
+  retention: 2d
