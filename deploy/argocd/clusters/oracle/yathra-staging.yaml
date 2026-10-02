@@ -1,0 +1,36 @@
+# Staging: CI writes every new image tag on main into deploy/environments/staging/values.yaml,
+# and Argo CD rolls it out.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: yathra-staging
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: yathra
+  sources:
+    - repoURL: https://github.com/Adeeshalytics/Yathra.git
+      targetRevision: main
+      path: deploy/charts/yathra
+      helm:
+        releaseName: yathra
+        valueFiles:
+          - ../../environments/staging/values.yaml
+          - ../../environments/staging/secrets.yaml
+        # secrets.yaml appears once new-app-secret.sh has sealed the keys for this cluster.
+        ignoreMissingValueFiles: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: yathra-staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: restricted
+        pod-security.kubernetes.io/warn: restricted

@@ -1,0 +1,33 @@
+# The local k3d cluster. Its images are built and imported by `make images`, and its Secret is
+# created by `make secret` (a sealed file would be specific to one throwaway cluster).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: yathra-local
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: yathra
+  sources:
+    - repoURL: https://github.com/Adeeshalytics/Yathra.git
+      targetRevision: main
+      path: deploy/charts/yathra
+      helm:
+        releaseName: yathra
+        valueFiles:
+          - ../../environments/local/values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: yathra-local
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: restricted
+        pod-security.kubernetes.io/warn: restricted

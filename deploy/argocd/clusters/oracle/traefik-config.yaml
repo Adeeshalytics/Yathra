@@ -1,0 +1,23 @@
+# The real server only: real client addresses and HTTP → HTTPS (deploy/platform/traefik-config.yaml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traefik-config
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: platform
+  sources:
+    - repoURL: https://github.com/Adeeshalytics/Yathra.git
+      targetRevision: main
+      path: deploy/platform
+      directory:
+        include: traefik-config.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

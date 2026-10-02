@@ -1,0 +1,7 @@
+# Everything Argo CD runs on the local k3d cluster (deploy/local). No Traefik settings: plain
+# HTTP, and client addresses do not matter here.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  - yathra-local.yaml

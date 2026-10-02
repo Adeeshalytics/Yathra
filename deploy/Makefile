@@ -1,7 +1,8 @@
 # The Kubernetes side, run from deploy/. See docs/devops/03-kubernetes.md.
 #
 # A complete local environment on k3d (k3s in Docker), the same software as the real cluster:
-#   make up        cluster + platform + images + secret + app       (~10 minutes the first time)
+#   make up        cluster + platform + images + secret + app, with Helm (~10 minutes)
+#   make up-gitops the same, but Argo CD deploys everything from GitHub (D4)
 #   make seed      demo data (operators, routes, trips) and accounts
 #   make down      delete the local cluster
 #
@@ -18,13 +19,25 @@ REGISTRY := ghcr.io/adeeshalytics
 TAG := local
 SEED_PASSWORD ?=
 
-.PHONY: help up cluster platform images namespace secret deploy seed status open down template
+.PHONY: help up up-gitops argocd-ui cluster platform images namespace secret deploy seed status open down template
 
 help: ## List the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
 
 up: cluster platform images namespace secret deploy ## Everything, from nothing to a running site
 	@echo "Open http://yathra.localhost — then 'make seed' for demo data."
+
+REVISION ?= main
+up-gitops: cluster images ## The same, but Argo CD installs everything from GitHub (REVISION=branch)
+	REVISION=$(REVISION) bash argocd/install.sh local
+	@echo "Waiting for Argo CD to create the $(NAMESPACE) namespace…"
+	@until kubectl get namespace $(NAMESPACE) >/dev/null 2>&1; do sleep 5; done
+	$(MAKE) secret
+	@echo "Argo CD: 'make argocd-ui'. The site: http://yathra.localhost once 'make status' is all Running."
+
+argocd-ui: ## Print the Argo CD admin password and open a tunnel to the UI on :8443
+	@echo "user admin, password: $$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
+	kubectl -n argocd port-forward svc/argocd-server 8443:80
 
 cluster: ## Create the k3d cluster (skipped if it exists)
 	k3d cluster list $(CLUSTER) >/dev/null 2>&1 || k3d cluster create --config local/k3d.yaml
@@ -43,6 +56,8 @@ namespace: ## The environment's namespace, enforcing the "restricted" Pod Securi
 	  pod-security.kubernetes.io/enforce=restricted pod-security.kubernetes.io/warn=restricted
 
 secret: ## Generate the app's keys as a SealedSecret and apply it (once per namespace)
+	@until kubectl -n kube-system get deploy sealed-secrets-controller >/dev/null 2>&1; do sleep 5; done
+	@kubectl -n kube-system rollout status deploy/sealed-secrets-controller --timeout=5m >/dev/null
 	@if kubectl -n $(NAMESPACE) get secret yathra-app >/dev/null 2>&1; then \
 	  echo "Secret yathra-app already exists in $(NAMESPACE)"; \
 	else \

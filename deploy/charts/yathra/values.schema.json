@@ -57,6 +57,12 @@
         "settingsModule": { "enum": ["config.settings.staging", "config.settings.production"] },
         "adminPath": { "type": "string", "pattern": "^[a-zA-Z0-9_-]+$" },
         "secretName": { "type": "string", "minLength": 1 },
+        "sealedSecret": {
+          "description": "encryptedData of the SealedSecret, from deploy/scripts/new-app-secret.sh.",
+          "type": "object",
+          "propertyNames": { "pattern": "^[A-Z][A-Z0-9_]*$" },
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
         "trustedProxyCount": { "type": "integer", "minimum": 0, "maximum": 5 },
         "paymentProviders": { "type": "string" },
         "smsBackend": { "enum": ["", "console", "notifylk"] },

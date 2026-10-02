@@ -1,0 +1,8 @@
+# Everything Argo CD runs on the Oracle Cloud k3s node (infra/).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  - traefik-config.yaml
+  - yathra-staging.yaml
+  - yathra-production.yaml

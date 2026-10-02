@@ -29,8 +29,11 @@ django:
   # Where the Django admin is mounted (no slashes). The ingress routes it to the API.
   adminPath: django-admin
   # Secret with DJANGO_SECRET_KEY and MOCK_PAYMENT_SECRET (plus EMAIL_URL, PAYHERE_* when used).
-  # Created outside the chart — a SealedSecret in Git, or `make secret` on a local cluster.
   secretName: yathra-app
+  # Its values encrypted for one cluster by deploy/scripts/new-app-secret.sh (safe to commit).
+  # When set, the chart creates the SealedSecret; when empty, the Secret must already exist
+  # (`make secret` on a local cluster).
+  sealedSecret: {}
   # One reverse proxy (Traefik) appends to X-Forwarded-For in front of the app.
   trustedProxyCount: 1
   paymentProviders: mock
