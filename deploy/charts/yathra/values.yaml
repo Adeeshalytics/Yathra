@@ -48,9 +48,15 @@ backend:
   replicas: 1
   # gunicorn worker processes; each is a full copy of the app (~120 MB).
   workers: 2
+  # A load test (deploy/tests/load) saturates one pod at about 1.5 CPU cores, ~40 requests/s.
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilization: 70
   resources:
     requests:
-      cpu: 100m
+      cpu: 200m
       memory: 256Mi
     limits:
       memory: 512Mi

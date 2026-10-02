@@ -6,7 +6,11 @@ metadata:
   labels:
     {{- include "yathra.componentLabels" $component | nindent 4 }}
 spec:
+  {{- if not .Values.backend.autoscaling.enabled }}
+  # With autoscaling on, the HorizontalPodAutoscaler owns the replica count; setting it here
+  # too would make Argo CD and the autoscaler undo each other.
   replicas: {{ .Values.backend.replicas }}
+  {{- end }}
   revisionHistoryLimit: 3
   strategy:
     # Start the new pod and wait until it is ready before stopping an old one.
@@ -126,3 +130,35 @@ spec:
     - name: http
       port: 8000
       targetPort: http
+{{- if .Values.backend.autoscaling.enabled }}
+---
+# More API pods when they are busy, fewer when they are not. CPU is measured against the
+# container's CPU request, so the request should reflect a real working load.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "yathra.fullname" . }}-api
+  labels:
+    {{- include "yathra.componentLabels" $component | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "yathra.fullname" . }}-api
+  minReplicas: {{ .Values.backend.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.backend.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.backend.autoscaling.targetCPUUtilization }}
+  behavior:
+    # Scale up quickly, scale down slowly: a brief lull should not drop capacity that the next
+    # burst will need again.
+    scaleUp:
+      stabilizationWindowSeconds: 0
+    scaleDown:
+      stabilizationWindowSeconds: 300
+{{- end }}

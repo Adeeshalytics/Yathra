@@ -82,6 +82,16 @@
       "properties": {
         "replicas": { "type": "integer", "minimum": 1 },
         "workers": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "autoscaling": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "minReplicas": { "type": "integer", "minimum": 1 },
+            "maxReplicas": { "type": "integer", "minimum": 1 },
+            "targetCPUUtilization": { "type": "integer", "minimum": 10, "maximum": 100 }
+          }
+        },
         "resources": { "$ref": "#/definitions/resources" }
       }
     },

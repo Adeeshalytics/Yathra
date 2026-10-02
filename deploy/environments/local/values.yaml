@@ -24,3 +24,8 @@ postgres:
 
 metrics:
   enabled: true
+
+backend:
+  # Proven here with `make load-test VUS=80`: more API pods under load, back to one after.
+  autoscaling:
+    enabled: true
