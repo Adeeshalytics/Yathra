@@ -1,4 +1,7 @@
-# Yathra — Bus Booking Platform (Phases 0–6)
+# Yathra — Bus Booking Platform
+
+[![CI](https://github.com/Adeeshalytics/Yathra/actions/workflows/ci.yml/badge.svg)](https://github.com/Adeeshalytics/Yathra/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Adeeshalytics/Yathra/actions/workflows/codeql.yml/badge.svg)](https://github.com/Adeeshalytics/Yathra/actions/workflows/codeql.yml)
 
 A production-oriented intercity bus booking platform for Sri Lanka (similar in concept to
 Magiya.lk), built in phases:
@@ -30,12 +33,17 @@ Magiya.lk), built in phases:
 - **Launch pack** — tickets by SMS and e-mail with reminders and a shareable ticket link, booking
   with just a phone number, "Find my booking", and the operator portal. See
   [§21](#21-launch-pack-tickets-by-text-phone-sign-in-operator-portal).
+- **DevOps D1: CI** — every pull request is linted, tested against a real Postgres, built into
+  production images and scanned (Trivy, CodeQL, gitleaks); `main` publishes multi-arch images
+  to GitHub Container Registry with signed build provenance. See
+  [docs/devops](docs/devops/README.md).
 
 | Layer    | Stack |
 |----------|-------|
 | Frontend | Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · shadcn/ui (Radix) · TanStack Query 5 · React Hook Form · Zod 4 |
 | Backend  | Django 5.2 LTS · Django REST Framework · SimpleJWT · PostgreSQL 17 · Redis 7 (cache/throttling) · drf-spectacular (OpenAPI) |
 | Tooling  | Docker Compose · pytest · ruff · ESLint · `tsc` |
+| DevOps   | GitHub Actions · GitHub Container Registry · Trivy · CodeQL · gitleaks · Dependabot |
 
 > "Yathra" is a working name. Change it with `APP_NAME` (backend) and `NEXT_PUBLIC_APP_NAME` (frontend).
 
@@ -373,6 +381,7 @@ sequenceDiagram
 | Method & path | Access | Purpose |
 |---------------|--------|---------|
 | `GET /api/v1/health/` | public | DB + cache readiness probe |
+| `GET /api/v1/health/live/` | public | Liveness probe (process only) |
 | `POST /api/v1/auth/register/` | public | Create customer account, start session |
 | `POST /api/v1/auth/login/` | public | Log in (any role) |
 | `POST /api/v1/auth/refresh/` | refresh cookie | New access token (rotates refresh) |
@@ -455,6 +464,10 @@ appears in the logs:
 Delivered since: notifications and operator self-service ([§21](#21-launch-pack-tickets-by-text-phone-sign-in-operator-portal)).
 Still to come: a crew boarding scanner, Sinhala and Tamil, an admin editor for the cancellation
 policy, platform settings.
+
+In progress: the DevOps track — CI, infrastructure as code on Oracle Cloud's free tier,
+Kubernetes (k3s), GitOps with Argo CD, and monitoring. Plan and notes in
+[docs/devops](docs/devops/README.md).
 
 ---
 

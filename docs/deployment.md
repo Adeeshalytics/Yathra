@@ -65,8 +65,10 @@ curl -fsS https://api.yathra.lk/api/v1/health/
 ```
 
 `/api/v1/health/` reports the database and cache and answers `503` if either is down. Point the
-load balancer's health check at it; it is exempt from the HTTPS redirect so a plain-HTTP probe
-still works.
+load balancer's health check (or a Kubernetes readiness probe) at it. `/api/v1/health/live/`
+checks nothing but the process itself — use it for liveness probes, so a database outage takes
+pods out of rotation instead of restarting them all. Both are exempt from the HTTPS redirect so
+a plain-HTTP probe still works.
 
 ## 4. Scheduled jobs
 

@@ -77,7 +77,8 @@ in the schema.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/health/` | Liveness: database and cache |
+| GET | `/health/` | Readiness: database and cache (`503` if either is down) |
+| GET | `/health/live/` | Liveness: the process answers; checks nothing else |
 | GET | `/trips/search/` | Search trips: `from`, `to`, `date`, plus filters and sorting |
 | GET | `/trips/{id}/` | One trip |
 | GET | `/trips/{id}/stops/` | Boarding and drop-off points, with times |

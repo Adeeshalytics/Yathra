@@ -33,7 +33,7 @@ MIDDLEWARE = [
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = env.bool("DJANGO_SECURE_SSL_REDIRECT", default=True)
 # Health checks from the load balancer usually arrive over plain HTTP.
-SECURE_REDIRECT_EXEMPT = [r"^api/v1/health/$"]
+SECURE_REDIRECT_EXEMPT = [r"^api/v1/health/$", r"^api/v1/health/live/$"]
 
 SECURE_HSTS_SECONDS = env.int("DJANGO_SECURE_HSTS_SECONDS", default=60 * 60 * 24 * 30)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True)
