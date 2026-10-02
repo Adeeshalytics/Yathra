@@ -94,6 +94,16 @@ cronJobDefaults:
     limits:
       memory: 256Mi
 
+networkPolicy:
+  # Deny all inbound traffic to this environment's pods except the paths the app uses
+  # (templates/networkpolicy.yaml). Enforced by k3s' built-in network-policy controller.
+  enabled: true
+  ingressNamespace: kube-system
+  ingressPodLabels:
+    app.kubernetes.io/name: traefik
+  monitoringNamespace: monitoring
+  cnpgNamespace: cnpg-system
+
 metrics:
   # Prometheus scraping (API and database), alert rules and the Grafana dashboard. Needs the
   # monitoring stack (deploy/platform: kube-prometheus-stack), whose CRDs these objects are.

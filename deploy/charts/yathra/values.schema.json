@@ -125,6 +125,17 @@
         "resources": { "$ref": "#/definitions/resources" }
       }
     },
+    "networkPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "ingressNamespace": { "type": "string", "minLength": 1 },
+        "ingressPodLabels": { "type": "object", "additionalProperties": { "type": "string" } },
+        "monitoringNamespace": { "type": "string", "minLength": 1 },
+        "cnpgNamespace": { "type": "string", "minLength": 1 }
+      }
+    },
     "metrics": {
       "type": "object",
       "additionalProperties": false,
