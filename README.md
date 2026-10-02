@@ -302,7 +302,7 @@ Nothing secret is committed. Each app has an `.env.example`; real `.env` files a
 
 | Variable | Notes |
 |----------|-------|
-| `NEXT_PUBLIC_API_URL` | Absolute API base incl. version, e.g. `https://api.example.lk/api/v1`. Required for production builds (validated with Zod at build time). |
+| `NEXT_PUBLIC_API_URL` | API base incl. version: absolute (`https://api.example.lk/api/v1`) or a path on the same site (`/api/v1`, the Docker image's default). Validated with Zod at build time. |
 | `NEXT_PUBLIC_APP_NAME` | Display name |
 
 `NEXT_PUBLIC_*` values are embedded in the browser bundle — never put secrets in them.
@@ -988,8 +988,9 @@ payment.started · payment.captured · payment.recorded · payment.checkout_fail
 payment.amount_mismatch · refund.status_changed · admin.action
 ```
 
-A failed sign-in records the email and the caller's address but never the password; `X-Forwarded-For`
-is only believed when `TRUST_PROXY_HEADERS` says the deployment sits behind a proxy that sets it.
+A failed sign-in records the email and the caller's address but never the password. The caller's
+address — for the log and for rate limiting alike — comes from `X-Forwarded-For` only as far as
+`TRUSTED_PROXY_COUNT` proxies vouch for it; entries a client added itself are ignored.
 `apps/core/tests/test_event_logging.py` asserts each event fires with the right fields.
 
 ### Four environments, not two
