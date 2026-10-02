@@ -11,6 +11,6 @@ redis==8.1.0
 whitenoise==6.12.0
 argon2-cffi==25.1.0
 # E-ticket PDFs, report PDFs and QR codes (pure Python; pulls in Pillow).
-reportlab==4.5.1
+reportlab==5.0.1
 # Excel exports for the admin reports.
 openpyxl==3.1.5
