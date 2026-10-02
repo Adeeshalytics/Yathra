@@ -17,6 +17,7 @@ SEALED_SECRETS_VERSION=2.20.0 # controller 0.40.0 — keep kubeseal at the same 
 KPS_CHART_VERSION=91.8.2      # kube-prometheus-stack (Prometheus Operator v0.94.1)
 LOKI_CHART_VERSION=7.3.0      # Loki 3.6
 ALLOY_CHART_VERSION=1.13.0    # Alloy v1.20
+BARMAN_CHART_VERSION=0.8.1    # CloudNativePG Barman Cloud plugin v0.15.1
 
 step() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 
@@ -53,6 +54,11 @@ helm upgrade --install sealed-secrets sealed-secrets \
   --repo https://bitnami.github.io/sealed-secrets --version "$SEALED_SECRETS_VERSION" \
   --namespace kube-system \
   --values "$HERE/values/sealed-secrets.yaml" --wait
+
+step "Barman Cloud plugin (database backups)"
+helm upgrade --install barman-cloud plugin-barman-cloud \
+  --repo https://cloudnative-pg.github.io/charts --version "$BARMAN_CHART_VERSION" \
+  --namespace cnpg-system --wait
 
 step "Let's Encrypt issuers"
 kubectl apply -f "$HERE/cluster-issuers.yaml"

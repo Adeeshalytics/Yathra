@@ -93,6 +93,31 @@ spec:
             description: "CloudNativePG reports the {{ $db }} database as down."
         {{- end }}
 
+        {{- if .Values.backup.enabled }}
+        - alert: YathraWalArchivingFailing
+          # The most recent attempt to ship a WAL segment failed, and has kept failing: point-in-
+          # time recovery is falling behind, and pg_wal is filling the database's disk.
+          expr: cnpg_pg_stat_archiver_last_failed_time{namespace="{{ $ns }}"} > cnpg_pg_stat_archiver_last_archived_time{namespace="{{ $ns }}"}
+          for: 15m
+          labels:
+            severity: critical
+            {{- with .Values.metrics.alertLabels }}{{ toYaml . | nindent 12 }}{{ end }}
+          annotations:
+            summary: "{{ $ns }}: PostgreSQL cannot archive its WAL to the object store"
+            description: "kubectl -n {{ $ns }} logs {{ $db }}-1 -c plugin-barman-cloud shows why (credentials, bucket, network)."
+
+        - alert: YathraBackupStale
+          # Nightly base backups: more than 26 hours since the last good one means one was missed.
+          expr: time() - max(barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="{{ $ns }}"}) > 26 * 3600
+          for: 1h
+          labels:
+            severity: warning
+            {{- with .Values.metrics.alertLabels }}{{ toYaml . | nindent 12 }}{{ end }}
+          annotations:
+            summary: "{{ $ns }}: no successful database backup in over a day"
+            description: "kubectl -n {{ $ns }} get backups shows the recent ones and their errors."
+        {{- end }}
+
         - alert: YathraScheduledJobFailing
           # A failed run of one of the CronJobs (seat holds, notifications, payments, routes).
           expr: |

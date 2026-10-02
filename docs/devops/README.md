@@ -12,7 +12,7 @@ should be able to answer about it.
 | **D3 — Kubernetes** | Helm chart (API, web, migration Job, CronJobs, CloudNativePG, Redis, ingress), cert-manager, Sealed Secrets, "restricted" pod security, tested end to end on a local k3d cluster | [Notes](03-kubernetes.md) |
 | **D4 — GitOps** | Argo CD app-of-apps: CI commits the image tag, staging syncs itself, production is promoted by pull request, rollback is `git revert`; bootstrapped from an empty cluster | [Notes](04-gitops.md) |
 | **D5 — Observability** | Prometheus (golden signals + business-event metrics), Loki + Alloy logs, Grafana dashboard and unit-tested alert rules shipped in the chart, external uptime checks | [Notes](05-observability.md) |
-| D6 — Reliability | Nightly backups to object storage + a restore drill, k6 load test of search → hold → book, autoscaling, network policies, runbook | Planned |
+| **D6 — Reliability** | Default-deny network policies, k6 load test against SLOs, API autoscaling, continuous PostgreSQL backups with a passing restore drill, runbook | [Notes](06-reliability.md) · [Runbook](runbook.md) |
 
 ## Free services this relies on
 

@@ -1,0 +1,124 @@
+# An S3-compatible object store for the local cluster (RustFS), standing in for Oracle Object
+# Storage so database backups and the restore drill can be tested on this machine.
+# `make object-store` applies it. The credentials below are for this throwaway local store only.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: object-store
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rustfs
+  namespace: object-store
+stringData:
+  RUSTFS_ACCESS_KEY: local-backups
+  RUSTFS_SECRET_KEY: local-backups-not-a-secret
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rustfs
+  namespace: object-store
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: rustfs
+  template:
+    metadata:
+      labels:
+        app: rustfs
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        - name: rustfs
+          image: rustfs/rustfs:1.0.0
+          args: ["server", "/data"]
+          env:
+            - name: RUSTFS_ADDRESS
+              value: ":9000"
+          envFrom:
+            - secretRef:
+                name: rustfs
+          ports:
+            - containerPort: 9000
+          readinessProbe:
+            tcpSocket:
+              port: 9000
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: rustfs
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rustfs
+  namespace: object-store
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rustfs
+  namespace: object-store
+spec:
+  selector:
+    app: rustfs
+  ports:
+    - port: 9000
+---
+# Barman does not create buckets: make the one the local environment backs up to.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-backup-bucket
+  namespace: object-store
+spec:
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-bucket
+          image: amazon/aws-cli:2.37.8
+          command:
+            - sh
+            - -c
+            - aws s3api head-bucket --bucket yathra-backups || aws s3api create-bucket --bucket yathra-backups
+          env:
+            - name: AWS_ENDPOINT_URL
+              value: http://rustfs:9000
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: rustfs
+                  key: RUSTFS_ACCESS_KEY
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rustfs
+                  key: RUSTFS_SECRET_KEY

@@ -18,6 +18,7 @@ spec:
         valueFiles:
           - ../../environments/production/values.yaml
           - ../../environments/production/secrets.yaml
+          - ../../environments/production/backup-credentials.yaml
         ignoreMissingValueFiles: true
   destination:
     server: https://kubernetes.default.svc

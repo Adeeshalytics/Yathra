@@ -1,0 +1,70 @@
+{{- if and .Values.postgres.enabled .Values.backup.enabled }}
+{{- $db := include "yathra.dbClusterName" . -}}
+{{- /*
+Backups with CloudNativePG's Barman Cloud plugin: every WAL segment is shipped to the object
+store as it is written, plus a full base backup on a schedule. Together they allow restoring
+the database to any moment inside the retention window (point-in-time recovery).
+See docs/devops/06-reliability.md and deploy/scripts/restore-drill.sh.
+*/ -}}
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: {{ $db }}-backups
+  labels:
+    {{- include "yathra.labels" . | nindent 4 }}
+spec:
+  retentionPolicy: {{ .Values.backup.retention | quote }}
+  configuration:
+    destinationPath: {{ required "backup.destinationPath is required, e.g. s3://yathra-backups/staging" .Values.backup.destinationPath | quote }}
+    {{- with .Values.backup.endpointURL }}
+    endpointURL: {{ . | quote }}
+    {{- end }}
+    s3Credentials:
+      accessKeyId:
+        name: {{ .Values.backup.credentialsSecret }}
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: {{ .Values.backup.credentialsSecret }}
+        key: ACCESS_SECRET_KEY
+      {{- if .Values.backup.regionFromSecret }}
+      region:
+        name: {{ .Values.backup.credentialsSecret }}
+        key: REGION
+      {{- end }}
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ $db }}-nightly
+  labels:
+    {{- include "yathra.labels" . | nindent 4 }}
+spec:
+  # Six fields, seconds first; the operator's clock is UTC.
+  schedule: {{ .Values.backup.schedule | quote }}
+  backupOwnerReference: self
+  cluster:
+    name: {{ $db }}
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+{{- with .Values.backup.sealedCredentials }}
+---
+# The object store's keys, sealed for this environment's cluster (safe in Git).
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: {{ $.Values.backup.credentialsSecret }}
+  labels:
+    {{- include "yathra.labels" $ | nindent 4 }}
+spec:
+  encryptedData:
+    {{- toYaml . | nindent 4 }}
+  template:
+    metadata:
+      name: {{ $.Values.backup.credentialsSecret }}
+{{- end }}
+{{- end }}

@@ -18,7 +18,9 @@ spec:
         valueFiles:
           - ../../environments/staging/values.yaml
           - ../../environments/staging/secrets.yaml
-        # secrets.yaml appears once new-app-secret.sh has sealed the keys for this cluster.
+          - ../../environments/staging/backup-credentials.yaml
+        # secrets.yaml and backup-credentials.yaml appear once they are sealed for this cluster
+        # (new-app-secret.sh, seal-backup-credentials.sh).
         ignoreMissingValueFiles: true
   destination:
     server: https://kubernetes.default.svc

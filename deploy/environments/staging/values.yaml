@@ -19,3 +19,12 @@ postgres:
 
 metrics:
   enabled: true
+
+backup:
+  # PostgreSQL to Oracle Object Storage (bucket yathra-backups, infra/terraform/cluster), through
+  # its S3-compatible API. Set the endpoint's namespace — `terraform -chdir=infra/terraform/cluster
+  # output -raw backup_endpoint` — and seal the keys (docs/devops/06-reliability.md).
+  enabled: true
+  destinationPath: s3://yathra-backups/staging
+  endpointURL: https://NAMESPACE.compat.objectstorage.ap-hyderabad-1.oraclecloud.com
+  regionFromSecret: true

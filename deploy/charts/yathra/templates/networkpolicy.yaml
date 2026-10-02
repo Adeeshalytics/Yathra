@@ -1,0 +1,122 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $db := include "yathra.dbClusterName" . -}}
+{{- /*
+Zero trust inside the cluster: nothing may connect to a pod in this namespace unless a policy
+below says so. Only inbound traffic is restricted — the API must still reach DNS, payment
+gateways, the routing service and mail. k3s enforces these with its built-in network-policy
+controller. See docs/devops/06-reliability.md.
+*/ -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "yathra.fullname" . }}-default-deny
+  labels:
+    {{- include "yathra.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# The web app: only from the ingress controller.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "yathra.fullname" . }}-web
+  labels:
+    {{- include "yathra.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "yathra.selectorLabels" (dict "ctx" . "component" "web") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - {{- include "yathra.ingressControllerPeer" . | nindent 10 }}
+      ports:
+        - port: 3000
+---
+# The API: from the ingress controller, and from Prometheus for /metrics.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "yathra.fullname" . }}-api
+  labels:
+    {{- include "yathra.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "yathra.selectorLabels" (dict "ctx" . "component" "api") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - {{- include "yathra.ingressControllerPeer" . | nindent 10 }}
+      ports:
+        - port: 8000
+    {{- if .Values.metrics.enabled }}
+    - from:
+        - {{- include "yathra.prometheusPeer" . | nindent 10 }}
+      ports:
+        - port: 8000
+    {{- end }}
+---
+# Redis: only from this release's own pods (API, migrations, scheduled jobs).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "yathra.fullname" . }}-redis
+  labels:
+    {{- include "yathra.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "yathra.selectorLabels" (dict "ctx" . "component" "redis") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: yathra
+      ports:
+        - port: 6379
+{{- if .Values.postgres.enabled }}
+---
+# PostgreSQL: SQL from this release's pods and from the other database pods (replication,
+# backups); the operator manages the instances on their status port; Prometheus scrapes 9187.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $db }}
+  labels:
+    {{- include "yathra.labels" . | nindent 4 }}
+spec:
+  # Every CloudNativePG instance in the namespace: the environment's database, and a cluster
+  # restored from its backups by the restore drill.
+  podSelector:
+    matchExpressions:
+      - key: cnpg.io/cluster
+        operator: Exists
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: yathra
+        - podSelector:
+            matchExpressions:
+              - key: cnpg.io/cluster
+                operator: Exists
+      ports:
+        - port: 5432
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.cnpgNamespace }}
+      ports:
+        - port: 8000
+    {{- if .Values.metrics.enabled }}
+    - from:
+        - {{- include "yathra.prometheusPeer" . | nindent 10 }}
+      ports:
+        - port: 9187
+    {{- end }}
+{{- end }}
+{{- end }}

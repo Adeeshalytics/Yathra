@@ -11,6 +11,12 @@ tls:
 
 django:
   logFormat: console
+  extraEnv:
+    # A load test runs from one machine, i.e. one address; at the normal limits it would
+    # measure the rate limiter instead of the app (deploy/tests/load). Both rates: DRF's
+    # UserRateThrottle also limits anonymous requests, per address, at the "user" rate.
+    THROTTLE_RATE_ANON: 100000/min
+    THROTTLE_RATE_USER: 100000/min
 
 postgres:
   storage:
@@ -18,3 +24,16 @@ postgres:
 
 metrics:
   enabled: true
+
+backend:
+  # Proven here with `make load-test VUS=80`: more API pods under load, back to one after.
+  autoscaling:
+    enabled: true
+
+backup:
+  enabled: true
+  # The RustFS store from deploy/local/object-store.yaml; `make backup-secret` creates the
+  # credentials Secret.
+  destinationPath: s3://yathra-backups/local
+  endpointURL: http://rustfs.object-store:9000
+  retention: 2d

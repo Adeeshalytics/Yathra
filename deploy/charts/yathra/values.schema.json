@@ -82,6 +82,16 @@
       "properties": {
         "replicas": { "type": "integer", "minimum": 1 },
         "workers": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "autoscaling": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "minReplicas": { "type": "integer", "minimum": 1 },
+            "maxReplicas": { "type": "integer", "minimum": 1 },
+            "targetCPUUtilization": { "type": "integer", "minimum": 10, "maximum": 100 }
+          }
+        },
         "resources": { "$ref": "#/definitions/resources" }
       }
     },
@@ -125,6 +135,17 @@
         "resources": { "$ref": "#/definitions/resources" }
       }
     },
+    "networkPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "ingressNamespace": { "type": "string", "minLength": 1 },
+        "ingressPodLabels": { "type": "object", "additionalProperties": { "type": "string" } },
+        "monitoringNamespace": { "type": "string", "minLength": 1 },
+        "cnpgNamespace": { "type": "string", "minLength": 1 }
+      }
+    },
     "metrics": {
       "type": "object",
       "additionalProperties": false,
@@ -158,6 +179,20 @@
             "secretKey": { "type": "string" }
           }
         }
+      }
+    },
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "destinationPath": { "type": "string", "pattern": "^(s3://.+)?$" },
+        "endpointURL": { "type": "string" },
+        "regionFromSecret": { "type": "boolean" },
+        "credentialsSecret": { "type": "string", "minLength": 1 },
+        "sealedCredentials": { "type": "object", "additionalProperties": { "type": "string" } },
+        "retention": { "type": "string", "pattern": "^[0-9]+[dwm]$" },
+        "schedule": { "type": "string", "minLength": 11 }
       }
     },
     "redis": {

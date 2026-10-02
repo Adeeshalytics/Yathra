@@ -17,19 +17,19 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/* Labels for objects that belong to the release as a whole (ConfigMap, Ingress). */}}
 {{- define "yathra.labels" -}}
 {{ include "yathra.commonLabels" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/instance: {{ .Release.Name | quote }}
 {{- end -}}
 
 {{/* Selector labels for one component: include with (dict "ctx" $ "component" "api"). */}}
 {{- define "yathra.selectorLabels" -}}
-app.kubernetes.io/name: {{ .component }}
-app.kubernetes.io/instance: {{ .ctx.Release.Name }}
+app.kubernetes.io/name: {{ .component | quote }}
+app.kubernetes.io/instance: {{ .ctx.Release.Name | quote }}
 {{- end -}}
 
 {{- define "yathra.componentLabels" -}}
 {{ include "yathra.commonLabels" .ctx }}
 {{ include "yathra.selectorLabels" . }}
-app.kubernetes.io/component: {{ .component }}
+app.kubernetes.io/component: {{ .component | quote }}
 {{- end -}}
 
 {{- define "yathra.image" -}}
@@ -118,4 +118,23 @@ schema, so new code never runs against an old schema. Used by the API and the Cr
 {{/* Restarts pods when the configuration they read at start-up changes. */}}
 {{- define "yathra.configChecksum" -}}
 checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+{{- end -}}
+
+{{/* NetworkPolicy peers: the ingress controller's pods, and Prometheus. */}}
+{{- define "yathra.ingressControllerPeer" -}}
+namespaceSelector:
+  matchLabels:
+    kubernetes.io/metadata.name: {{ .Values.networkPolicy.ingressNamespace }}
+podSelector:
+  matchLabels:
+    {{- toYaml .Values.networkPolicy.ingressPodLabels | nindent 4 }}
+{{- end -}}
+
+{{- define "yathra.prometheusPeer" -}}
+namespaceSelector:
+  matchLabels:
+    kubernetes.io/metadata.name: {{ .Values.networkPolicy.monitoringNamespace }}
+podSelector:
+  matchLabels:
+    app.kubernetes.io/name: prometheus
 {{- end -}}

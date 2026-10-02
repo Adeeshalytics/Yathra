@@ -26,6 +26,14 @@ spec:
       # creating it here keeps the first migration independent of the owner's privileges).
       postInitApplicationSQL:
         - CREATE EXTENSION IF NOT EXISTS btree_gist
+  {{- if .Values.backup.enabled }}
+  # Ship every WAL segment to the object store (templates/backup.yaml).
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: {{ include "yathra.dbClusterName" . }}-backups
+  {{- end }}
   postgresql:
     parameters:
       {{- range $key, $value := .Values.postgres.parameters }}
