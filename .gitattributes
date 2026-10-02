@@ -5,3 +5,4 @@
 Makefile   text eol=lf
 infra/**   text eol=lf
 .github/** text eol=lf
+deploy/**  text eol=lf

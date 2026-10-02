@@ -10,6 +10,8 @@ set -euo pipefail
 
 TERRAFORM_VERSION=1.16.4
 KUBECTL_VERSION=v1.36.5 # same minor version as k3s (infra/ansible/group_vars/all.yml)
+HELM_VERSION=v4.3.0
+KUBESEAL_VERSION=0.40.0 # same as the Sealed Secrets controller (deploy/platform/install.sh)
 ANSIBLE_CORE_VERSION=2.21.4
 ANSIBLE_LINT_VERSION=26.9.0
 REGION=ap-hyderabad-1
@@ -45,6 +47,31 @@ if ! "$BIN/kubectl" version --client 2>/dev/null | grep -q "$KUBECTL_VERSION"; t
   rm -rf "$tmp"
 fi
 "$BIN/kubectl" version --client | head -1
+
+step "Helm $HELM_VERSION"
+if ! "$BIN/helm" version --short 2>/dev/null | grep -q "^$HELM_VERSION"; then
+  tmp=$(mktemp -d)
+  tgz="helm-$HELM_VERSION-linux-amd64.tar.gz"
+  curl -fsSLo "$tmp/$tgz" "https://get.helm.sh/$tgz"
+  echo "$(curl -fsSL "https://get.helm.sh/$tgz.sha256sum" | awk '{print $1}')  $tmp/$tgz" | sha256sum --check --quiet
+  tar -xzf "$tmp/$tgz" -C "$tmp" linux-amd64/helm
+  install -m 0755 "$tmp/linux-amd64/helm" "$BIN/helm"
+  rm -rf "$tmp"
+fi
+"$BIN/helm" version --short
+
+step "kubeseal $KUBESEAL_VERSION"
+if ! "$BIN/kubeseal" --version 2>/dev/null | grep -q "$KUBESEAL_VERSION"; then
+  tmp=$(mktemp -d)
+  base="https://github.com/bitnami-labs/sealed-secrets/releases/download/v$KUBESEAL_VERSION"
+  tgz="kubeseal-$KUBESEAL_VERSION-linux-amd64.tar.gz"
+  curl -fsSLo "$tmp/$tgz" "$base/$tgz"
+  (cd "$tmp" && curl -fsSL "$base/sealed-secrets_${KUBESEAL_VERSION}_checksums.txt" | grep " $tgz\$" | sha256sum --check --quiet)
+  tar -xzf "$tmp/$tgz" -C "$tmp" kubeseal
+  install -m 0755 "$tmp/kubeseal" "$BIN/kubeseal"
+  rm -rf "$tmp"
+fi
+"$BIN/kubeseal" --version
 
 step "Ansible $ANSIBLE_CORE_VERSION and ansible-lint $ANSIBLE_LINT_VERSION"
 pipx install --force "ansible-core==$ANSIBLE_CORE_VERSION" >/dev/null

@@ -1,0 +1,17 @@
+# A k3d cluster on this machine (deploy/local). Plain HTTP on http://yathra.localhost
+host: yathra.localhost
+
+image:
+  tag: local
+  # `make images` builds the images and imports them into the cluster; nothing is pulled.
+  pullPolicy: Never
+
+tls:
+  enabled: false
+
+django:
+  logFormat: console
+
+postgres:
+  storage:
+    size: 1Gi

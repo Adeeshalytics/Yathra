@@ -1,0 +1,47 @@
+{{- $component := dict "ctx" . "component" "migrate" -}}
+{{- /*
+One Job per image tag: the name changes with the tag, so every new release runs migrations
+once (Jobs cannot be edited in place), and the previous release's Job is removed. No Helm
+hooks — this works the same under `helm upgrade` and under Argo CD.
+*/ -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-migrate-%s" (include "yathra.fullname" .) (.Values.image.tag | sha256sum | trunc 10) }}
+  labels:
+    {{- include "yathra.componentLabels" $component | nindent 4 }}
+spec:
+  # Retries cover the database still starting on a first install.
+  backoffLimit: {{ .Values.migrations.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migrations.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ .Values.migrations.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "yathra.componentLabels" $component | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "yathra.podSecurityContext" (dict "uid" 999 "gid" 999) | nindent 8 }}
+      containers:
+        - name: migrate
+          image: {{ include "yathra.image" (dict "ctx" . "name" "backend") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "manage.py", "migrate", "--noinput"]
+          {{- include "yathra.backendEnv" . | nindent 10 }}
+          securityContext:
+            {{- include "yathra.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

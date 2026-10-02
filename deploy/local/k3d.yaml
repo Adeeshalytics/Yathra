@@ -1,0 +1,27 @@
+# A local Kubernetes cluster that matches the real one: k3s, the same version as
+# infra/ansible/group_vars/all.yml, running in Docker. The site is on http://yathra.localhost
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: yathra
+servers: 1
+agents: 0
+image: rancher/k3s:v1.36.5-k3s1
+# The Kubernetes API on 127.0.0.1 only. (k3d's default, host.docker.internal, resolves to the
+# LAN address on Docker Desktop for Windows, where the firewall blocks it.)
+kubeAPI:
+  hostIP: "127.0.0.1"
+  hostPort: "6550"
+ports:
+  - port: 80:80
+    nodeFilters:
+      - loadbalancer
+options:
+  k3s:
+    extraArgs:
+      - arg: --secrets-encryption
+        nodeFilters:
+          - server:*
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true

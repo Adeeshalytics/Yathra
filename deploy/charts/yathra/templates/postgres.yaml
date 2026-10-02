@@ -1,0 +1,36 @@
+{{- if .Values.postgres.enabled }}
+{{- /*
+A PostgreSQL cluster run by the CloudNativePG operator. The operator creates the database and
+its owner, generates the password, and publishes it in the Secret "<name>-app" (key "uri" is a
+ready-made connection URL), so no database password is ever written down anywhere.
+*/ -}}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "yathra.dbClusterName" . }}
+  labels:
+    {{- include "yathra.componentLabels" (dict "ctx" . "component" "db") | nindent 4 }}
+spec:
+  instances: {{ .Values.postgres.instances }}
+  imageName: {{ .Values.postgres.image }}
+  storage:
+    size: {{ .Values.postgres.storage.size }}
+    {{- with .Values.postgres.storage.storageClass }}
+    storageClass: {{ . }}
+    {{- end }}
+  bootstrap:
+    initdb:
+      database: yathra
+      owner: yathra
+      # The bus-overlap exclusion constraint needs btree_gist (a trusted extension, but
+      # creating it here keeps the first migration independent of the owner's privileges).
+      postInitApplicationSQL:
+        - CREATE EXTENSION IF NOT EXISTS btree_gist
+  postgresql:
+    parameters:
+      {{- range $key, $value := .Values.postgres.parameters }}
+      {{ $key }}: {{ $value | quote }}
+      {{- end }}
+  resources:
+    {{- toYaml .Values.postgres.resources | nindent 4 }}
+{{- end }}

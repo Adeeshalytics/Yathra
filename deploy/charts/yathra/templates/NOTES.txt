@@ -1,0 +1,11 @@
+Yathra {{ .Values.image.tag }} → {{ include "yathra.origin" . }}
+
+  kubectl -n {{ .Release.Namespace }} get pods
+  kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "yathra.fullname" . }}-api
+  kubectl -n {{ .Release.Namespace }} get cluster {{ include "yathra.dbClusterName" . }}    # PostgreSQL
+
+The API pods wait for the migration Job of this image tag before they start.
+{{- if not .Values.tls.enabled }}
+
+TLS is off: the site is served over plain HTTP.
+{{- end }}

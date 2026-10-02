@@ -1,0 +1,12 @@
+apiVersion: v2
+name: yathra
+description: >-
+  Yathra bus booking platform: the Django API, the Next.js web app, their scheduled jobs,
+  a PostgreSQL cluster (CloudNativePG) and a Redis cache, behind one host name.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.30.0-0"
+home: https://github.com/Adeeshalytics/Yathra
+sources:
+  - https://github.com/Adeeshalytics/Yathra

@@ -68,6 +68,65 @@ jobs:
           exit-code: "1"
           hide-progress: true
 
+  helm:
+    name: Helm chart
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: deploy
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.0
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSLo /tmp/kc.tgz https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz
+          echo "9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883  /tmp/kc.tgz" | sha256sum --check
+          tar -xzf /tmp/kc.tgz -C /usr/local/bin kubeconform
+
+      # Lint and validate every environment's values against the chart's values.schema.json.
+      - name: Lint
+        run: |
+          for env in environments/*/; do
+            helm lint charts/yathra --strict --values "$env/values.yaml" --set image.tag=sha-ci
+          done
+
+      # Render with each environment's values and check every object against the Kubernetes
+      # 1.36 API (and the CloudNativePG CRD) — the version k3s runs.
+      - name: Validate rendered manifests
+        run: |
+          for env in environments/*/; do
+            echo "::group::$env"
+            helm template yathra charts/yathra --values "$env/values.yaml" --set image.tag=sha-ci |
+              kubeconform -strict -summary -kubernetes-version 1.36.0 \
+                -schema-location default \
+                -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+            echo "::endgroup::"
+          done
+
+      - name: Render for the misconfiguration scan
+        run: |
+          mkdir -p /tmp/rendered
+          helm template yathra charts/yathra --set image.tag=sha-ci --set tls.enabled=true \
+            > /tmp/rendered/yathra.yaml
+
+      # Kubernetes security checks: privileged containers, missing limits, root users, writable
+      # root filesystems, host namespaces, …
+      - name: Misconfiguration scan (Trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: /tmp/rendered
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          hide-progress: true
+
   ansible:
     name: Ansible
     runs-on: ubuntu-24.04

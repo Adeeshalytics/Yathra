@@ -9,7 +9,7 @@ should be able to answer about it.
 |-------|--------------|--------|
 | **D1 — CI** | GitHub Actions: lint, tests on real Postgres, production image builds, Trivy / CodeQL / gitleaks scans, Dependabot, multi-arch images on GHCR with signed provenance | [Notes](01-ci.md) |
 | **D2 — Infrastructure as code** | Terraform for Oracle Cloud (network, Arm node, remote state with locking, quota + budget guardrails), Ansible to harden the server and install k3s | [Notes](02-iac.md) |
-| D3 — Kubernetes | Helm chart: API + web Deployments, migration Job, CronJobs for the scheduled commands, CloudNativePG, Redis, ingress + cert-manager, Sealed Secrets, staging and prod namespaces | Planned |
+| **D3 — Kubernetes** | Helm chart (API, web, migration Job, CronJobs, CloudNativePG, Redis, ingress), cert-manager, Sealed Secrets, "restricted" pod security, tested end to end on a local k3d cluster | [Notes](03-kubernetes.md) |
 | D4 — GitOps | Argo CD: CI bumps the image tag in Git, staging syncs itself, prod is promoted by pull request, rollback is `git revert` | Planned |
 | D5 — Observability | Prometheus, Grafana, Loki, Alertmanager → Discord/e-mail, `django-prometheus` app metrics, Sentry, uptime checks | Planned |
 | D6 — Reliability | Nightly backups to object storage + a restore drill, k6 load test of search → hold → book, autoscaling, network policies, runbook | Planned |
