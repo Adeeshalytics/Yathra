@@ -41,6 +41,7 @@ spec:
           command:
             - gunicorn
             - config.wsgi:application
+            - --config=python:config.gunicorn
             - --bind=0.0.0.0:8000
             - --workers={{ .Values.backend.workers }}
             # Heartbeat files live on the writable /tmp volume (the root filesystem is read-only).
@@ -51,6 +52,16 @@ spec:
             - name: http
               containerPort: 8000
           {{- include "yathra.backendEnv" . | nindent 10 }}
+            # Prometheus scrapes the pod by its IP address, which Django must accept as a host.
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: DJANGO_ALLOWED_HOSTS
+              value: {{ printf "%s,$(POD_IP)" .Values.host | quote }}
+            # gunicorn's workers pool their metrics here (config/gunicorn.py).
+            - name: PROMETHEUS_MULTIPROC_DIR
+              value: /tmp/prometheus
           # The kubelet calls probes with the pod's IP as the Host header, which Django's
           # ALLOWED_HOSTS would reject — so the probes present the site's host name.
           startupProbe:

@@ -125,6 +125,14 @@
         "resources": { "$ref": "#/definitions/resources" }
       }
     },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "alertLabels": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
     "postgres": {
       "type": "object",
       "additionalProperties": false,

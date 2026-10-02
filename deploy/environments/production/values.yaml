@@ -23,3 +23,6 @@ backend:
 postgres:
   storage:
     size: 10Gi
+
+metrics:
+  enabled: true

@@ -76,5 +76,9 @@ def log_event(event: str, /, *, level: int = logging.INFO, **fields) -> None:
     with logging own attributes are dropped rather than blowing up at the call site. Values are
     rendered by the formatter, so ids can be passed as they are.
     """
+    from .metrics import EVENTS
+
     safe = {key: value for key, value in fields.items() if key not in _STANDARD_ATTRS}
     logging.getLogger(EVENT_LOGGER).log(level, event, extra={"event": event, **safe})
+    # Event names are a fixed set written in the code, so they are safe as a metric label.
+    EVENTS.labels(event=event).inc()

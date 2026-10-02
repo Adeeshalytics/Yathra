@@ -19,7 +19,7 @@ REGISTRY := ghcr.io/adeeshalytics
 TAG := local
 SEED_PASSWORD ?=
 
-.PHONY: help up up-gitops argocd-ui cluster platform images namespace secret deploy seed status open down template
+.PHONY: help up up-gitops grafana argocd-ui cluster platform images namespace secret deploy seed status open down template
 
 help: ## List the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -35,6 +35,9 @@ up-gitops: cluster images ## The same, but Argo CD installs everything from GitH
 	$(MAKE) secret
 	@echo "Argo CD: 'make argocd-ui'. The site: http://yathra.localhost once 'make status' is all Running."
 
+grafana: ## Open a tunnel to Grafana on http://localhost:3000 (dashboards "Yathra — <namespace>")
+	kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80
+
 argocd-ui: ## Print the Argo CD admin password and open a tunnel to the UI on :8443
 	@echo "user admin, password: $$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
 	kubectl -n argocd port-forward svc/argocd-server 8443:80
@@ -42,7 +45,7 @@ argocd-ui: ## Print the Argo CD admin password and open a tunnel to the UI on :8
 cluster: ## Create the k3d cluster (skipped if it exists)
 	k3d cluster list $(CLUSTER) >/dev/null 2>&1 || k3d cluster create --config local/k3d.yaml
 
-platform: ## cert-manager, CloudNativePG, Sealed Secrets
+platform: ## Monitoring, cert-manager, CloudNativePG, Sealed Secrets
 	bash platform/install.sh local
 
 images: ## Build both production images and load them into the cluster

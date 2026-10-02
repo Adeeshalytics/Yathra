@@ -3,6 +3,8 @@ from django.contrib import admin
 from django.urls import include, path, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+from apps.core.metrics import metrics
+
 admin.site.site_header = f"{settings.APP_NAME} administration"
 admin.site.site_title = f"{settings.APP_NAME} admin"
 
@@ -10,6 +12,8 @@ urlpatterns = [
     path(settings.DJANGO_ADMIN_URL, admin.site.urls),
     # Every API route is versioned: /api/v1/...
     re_path(r"^api/(?P<version>v1)/", include("config.api_urls")),
+    # Prometheus scrape endpoint: internal only (see apps.core.metrics.metrics).
+    path("metrics", metrics, name="metrics"),
 ]
 
 if settings.API_DOCS_ENABLED:

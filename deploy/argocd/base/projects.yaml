@@ -6,7 +6,7 @@ metadata:
   name: platform
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-2"
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   description: Cluster-wide components every environment relies on.
   sourceRepos:
@@ -14,6 +14,8 @@ spec:
     - https://charts.jetstack.io
     - https://cloudnative-pg.github.io/charts
     - https://bitnami.github.io/sealed-secrets
+    - https://prometheus-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
   destinations:
     - server: https://kubernetes.default.svc
       namespace: cert-manager
@@ -21,6 +23,8 @@ spec:
       namespace: cnpg-system
     - server: https://kubernetes.default.svc
       namespace: kube-system
+    - server: https://kubernetes.default.svc
+      namespace: monitoring
   # Operators install CRDs, cluster roles and admission webhooks.
   clusterResourceWhitelist:
     - group: "*"
@@ -32,7 +36,7 @@ metadata:
   name: yathra
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-2"
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   description: The Yathra environments.
   sourceRepos:

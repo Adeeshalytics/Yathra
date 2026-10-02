@@ -1,0 +1,43 @@
+# First of the platform: its CRDs (ServiceMonitor, PodMonitor, PrometheusRule) are used by
+# cert-manager's chart and the Yathra chart in later waves.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: platform
+  sources:
+    - repoURL: https://github.com/Adeeshalytics/Yathra.git
+      targetRevision: main
+      ref: repo
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 91.8.2 # Prometheus Operator v0.94.1
+      helm:
+        releaseName: kube-prometheus-stack
+        valueFiles:
+          - $repo/deploy/platform/values/kube-prometheus-stack.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  # Grafana's chart generates a random admin password on every render (it cannot look up the
+  # existing one when Argo CD renders it), which would leave the app permanently OutOfSync.
+  # Grafana's login is switched off anyway (values file), so the first password is kept.
+  ignoreDifferences:
+    - kind: Secret
+      name: monitoring-grafana
+      namespace: monitoring
+      jsonPointers:
+        - /data/admin-password
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # Its CRDs are far too large for client-side apply's last-applied annotation.
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

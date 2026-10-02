@@ -1,0 +1,134 @@
+{{- if .Values.metrics.enabled }}
+{{- $ns := .Release.Namespace -}}
+{{- $api := printf "%s-api" (include "yathra.fullname" .) -}}
+{{- $db := include "yathra.dbClusterName" . -}}
+# What Prometheus scrapes, what it alerts on, and the dashboard — shipped with the app, so a
+# new environment arrives already monitored. See docs/devops/05-observability.md.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $api }}
+  labels:
+    {{- include "yathra.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "yathra.selectorLabels" (dict "ctx" . "component" "api") | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+{{- if .Values.postgres.enabled }}
+---
+# CloudNativePG's built-in exporter (port "metrics" on every database pod).
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ $db }}
+  labels:
+    {{- include "yathra.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: {{ $db }}
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+{{- end }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "yathra.fullname" . }}
+  labels:
+    {{- include "yathra.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: yathra-{{ $ns }}
+      rules:
+        - alert: YathraApiDown
+          expr: sum(up{namespace="{{ $ns }}", service="{{ $api }}"}) == 0 or absent(up{namespace="{{ $ns }}", service="{{ $api }}"})
+          for: 5m
+          labels:
+            severity: critical
+            {{- with .Values.metrics.alertLabels }}{{ toYaml . | nindent 12 }}{{ end }}
+          annotations:
+            summary: "{{ $ns }}: the API has no healthy pods"
+            description: "Prometheus has not been able to scrape any API pod in {{ $ns }} for 5 minutes."
+
+        - alert: YathraHighErrorRate
+          expr: |
+            sum(rate(django_http_responses_total_by_status_total{namespace="{{ $ns }}", status=~"5.."}[5m]))
+              / sum(rate(django_http_responses_total_by_status_total{namespace="{{ $ns }}"}[5m])) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+            {{- with .Values.metrics.alertLabels }}{{ toYaml . | nindent 12 }}{{ end }}
+          annotations:
+            summary: "{{ $ns }}: more than 5% of API responses are server errors"
+            description: '{{ "{{" }} $value | humanizePercentage {{ "}}" }} of responses were 5xx over the last 5 minutes.'
+
+        - alert: YathraSlowResponses
+          expr: |
+            histogram_quantile(0.95, sum by (le) (
+              rate(django_http_requests_latency_seconds_by_view_method_bucket{namespace="{{ $ns }}"}[5m])
+            )) > 1
+          for: 10m
+          labels:
+            severity: warning
+            {{- with .Values.metrics.alertLabels }}{{ toYaml . | nindent 12 }}{{ end }}
+          annotations:
+            summary: "{{ $ns }}: the slowest 5% of API requests take over a second"
+            description: '95th percentile latency is {{ "{{" }} $value | humanizeDuration {{ "}}" }}.'
+
+        {{- if .Values.postgres.enabled }}
+        - alert: YathraDatabaseDown
+          expr: max(cnpg_collector_up{namespace="{{ $ns }}", cluster="{{ $db }}"}) == 0 or absent(cnpg_collector_up{namespace="{{ $ns }}", cluster="{{ $db }}"})
+          for: 2m
+          labels:
+            severity: critical
+            {{- with .Values.metrics.alertLabels }}{{ toYaml . | nindent 12 }}{{ end }}
+          annotations:
+            summary: "{{ $ns }}: PostgreSQL is not responding"
+            description: "CloudNativePG reports the {{ $db }} database as down."
+        {{- end }}
+
+        - alert: YathraScheduledJobFailing
+          # A failed run of one of the CronJobs (seat holds, notifications, payments, routes).
+          expr: |
+            max by (owner_name) (
+              kube_job_status_failed{namespace="{{ $ns }}"}
+              * on (namespace, job_name) group_left (owner_name)
+              kube_job_owner{namespace="{{ $ns }}", owner_kind="CronJob"}
+            ) > 0
+          labels:
+            severity: warning
+            {{- with .Values.metrics.alertLabels }}{{ toYaml . | nindent 12 }}{{ end }}
+          annotations:
+            summary: '{{ $ns }}: scheduled job {{ "{{" }} $labels.owner_name {{ "}}" }} failed'
+            description: 'kubectl -n {{ $ns }} logs job/<the failed job> shows why.'
+
+        {{- if .Values.tls.enabled }}
+        - alert: YathraCertificateExpiring
+          # cert-manager renews 30 days before expiry; 14 days left means renewal is failing.
+          expr: (certmanager_certificate_expiration_timestamp_seconds{exported_namespace="{{ $ns }}"} - time()) < 14 * 24 * 3600
+          labels:
+            severity: warning
+            {{- with .Values.metrics.alertLabels }}{{ toYaml . | nindent 12 }}{{ end }}
+          annotations:
+            summary: "{{ $ns }}: the TLS certificate expires in under 14 days"
+            description: "cert-manager has not managed to renew it: kubectl -n {{ $ns }} describe certificate"
+        {{- end }}
+---
+# The dashboard, picked up by Grafana's sidecar from any namespace by its label.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "yathra.fullname" . }}-dashboard
+  labels:
+    {{- include "yathra.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  yathra-{{ $ns }}.json: |-
+    {{- .Files.Get "dashboards/yathra.json" | replace "__NAMESPACE__" $ns | nindent 4 }}
+{{- end }}

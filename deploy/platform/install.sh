@@ -14,8 +14,26 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 CERT_MANAGER_VERSION=v1.21.2  # https://cert-manager.io/docs/releases/
 CNPG_CHART_VERSION=0.29.1     # CloudNativePG operator 1.30.1
 SEALED_SECRETS_VERSION=2.20.0 # controller 0.40.0 — keep kubeseal at the same controller version
+KPS_CHART_VERSION=91.8.2      # kube-prometheus-stack (Prometheus Operator v0.94.1)
+LOKI_CHART_VERSION=7.3.0      # Loki 3.6
+ALLOY_CHART_VERSION=1.13.0    # Alloy v1.20
 
 step() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
+
+# First: its CRDs (ServiceMonitor, PrometheusRule, …) are used by cert-manager and the app.
+step "kube-prometheus-stack $KPS_CHART_VERSION (Prometheus, Alertmanager, Grafana)"
+helm upgrade --install kube-prometheus-stack kube-prometheus-stack \
+  --repo https://prometheus-community.github.io/helm-charts --version "$KPS_CHART_VERSION" \
+  --namespace monitoring --create-namespace \
+  --values "$HERE/values/kube-prometheus-stack.yaml" --wait --timeout 10m
+
+step "Loki $LOKI_CHART_VERSION and Alloy $ALLOY_CHART_VERSION (logs)"
+helm upgrade --install loki loki \
+  --repo https://grafana.github.io/helm-charts --version "$LOKI_CHART_VERSION" \
+  --namespace monitoring --values "$HERE/values/loki.yaml" --wait --timeout 10m
+helm upgrade --install alloy alloy \
+  --repo https://grafana.github.io/helm-charts --version "$ALLOY_CHART_VERSION" \
+  --namespace monitoring --values "$HERE/values/alloy.yaml" --wait
 
 step "cert-manager $CERT_MANAGER_VERSION (TLS certificates)"
 helm upgrade --install cert-manager cert-manager \

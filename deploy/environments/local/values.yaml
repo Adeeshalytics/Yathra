@@ -15,3 +15,6 @@ django:
 postgres:
   storage:
     size: 1Gi
+
+metrics:
+  enabled: true

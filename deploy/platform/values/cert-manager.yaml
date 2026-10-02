@@ -25,3 +25,9 @@ cainjector:
       memory: 64Mi
     limits:
       memory: 128Mi
+
+# Certificate expiry metrics for Prometheus (the Yathra chart alerts on them).
+prometheus:
+  enabled: true
+  servicemonitor:
+    enabled: true

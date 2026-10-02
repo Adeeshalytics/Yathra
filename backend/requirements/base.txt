@@ -14,3 +14,5 @@ argon2-cffi==25.1.0
 reportlab==4.5.1
 # Excel exports for the admin reports.
 openpyxl==3.1.5
+# Prometheus metrics: request/latency middleware and the /metrics endpoint.
+django-prometheus==2.5.0

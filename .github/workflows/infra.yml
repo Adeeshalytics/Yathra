@@ -110,6 +110,28 @@ jobs:
             echo "::endgroup::"
           done
 
+      # Schema validation cannot tell whether an alert's PromQL is valid; Prometheus' own
+      # promtool can. (Rendered with TLS on, so the certificate alert is included.)
+      - name: Check alert rules (promtool)
+        run: |
+          helm template yathra charts/yathra --values environments/staging/values.yaml \
+              --set image.tag=sha-ci --show-only templates/monitoring.yaml |
+            yq 'select(.kind == "PrometheusRule") | {"groups": .spec.groups}' > /tmp/yathra.rules.yaml
+          docker run --rm -v /tmp/yathra.rules.yaml:/rules.yaml:ro --entrypoint promtool \
+            quay.io/prometheus/prometheus:v3.15.0 check rules /rules.yaml
+
+      # The Argo CD Applications and projects each cluster runs, against their CRD schemas.
+      - name: Validate Argo CD manifests
+        run: |
+          for cluster in argocd/clusters/*/; do
+            echo "::group::$cluster"
+            kubectl kustomize "$cluster" |
+              kubeconform -strict -summary \
+                -schema-location default \
+                -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+            echo "::endgroup::"
+          done
+
       - name: Render for the misconfiguration scan
         run: |
           mkdir -p /tmp/rendered
