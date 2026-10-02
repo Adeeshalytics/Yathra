@@ -11,6 +11,10 @@ tls:
 
 django:
   logFormat: console
+  extraEnv:
+    # A load test runs from one machine, i.e. one address; at the normal 120/min per address
+    # it would measure the rate limiter instead of the app (deploy/tests/load).
+    THROTTLE_RATE_ANON: 100000/min
 
 postgres:
   storage:
