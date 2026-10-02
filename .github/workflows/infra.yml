@@ -110,15 +110,20 @@ jobs:
             echo "::endgroup::"
           done
 
-      # Schema validation cannot tell whether an alert's PromQL is valid; Prometheus' own
-      # promtool can. (Rendered with TLS on, so the certificate alert is included.)
-      - name: Check alert rules (promtool)
+      # Schema validation cannot tell whether an alert's PromQL is valid, or whether it fires
+      # when it should. promtool checks the rules, then runs deploy/tests/alerts.test.yaml:
+      # synthetic metrics in, expected alerts out. (TLS on, so the certificate alert is included.)
+      - name: Check and unit-test alert rules (promtool)
         run: |
-          helm template yathra charts/yathra --values environments/staging/values.yaml \
-              --set image.tag=sha-ci --show-only templates/monitoring.yaml |
-            yq 'select(.kind == "PrometheusRule") | {"groups": .spec.groups}' > /tmp/yathra.rules.yaml
-          docker run --rm -v /tmp/yathra.rules.yaml:/rules.yaml:ro --entrypoint promtool \
-            quay.io/prometheus/prometheus:v3.15.0 check rules /rules.yaml
+          mkdir -p /tmp/rules
+          helm template yathra charts/yathra --namespace yathra-test \
+              --values environments/staging/values.yaml --set image.tag=sha-ci \
+              --show-only templates/monitoring.yaml |
+            yq 'select(.kind == "PrometheusRule") | {"groups": .spec.groups}' > /tmp/rules/yathra.rules.yaml
+          docker run --rm -v /tmp/rules:/tmp/rules:ro -v "$PWD/tests:/tests:ro" --entrypoint promtool \
+            quay.io/prometheus/prometheus:v3.15.0 check rules /tmp/rules/yathra.rules.yaml
+          docker run --rm -v /tmp/rules:/tmp/rules:ro -v "$PWD/tests:/tests:ro" --entrypoint promtool \
+            quay.io/prometheus/prometheus:v3.15.0 test rules /tests/alerts.test.yaml
 
       # The Argo CD Applications and projects each cluster runs, against their CRD schemas.
       - name: Validate Argo CD manifests

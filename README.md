@@ -47,13 +47,16 @@ Magiya.lk), built in phases:
 - **DevOps D4: GitOps** — Argo CD keeps the cluster equal to Git: every merge reaches staging
   by itself, production moves by pull request, CI holds no cluster credentials. See
   [docs/devops/04-gitops.md](docs/devops/04-gitops.md).
+- **DevOps D5: observability** — Prometheus metrics (including bookings, payments and sign-ins),
+  logs in Loki, a Grafana dashboard and unit-tested alert rules shipped with the chart, and an
+  external uptime check. See [docs/devops/05-observability.md](docs/devops/05-observability.md).
 
 | Layer    | Stack |
 |----------|-------|
 | Frontend | Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · shadcn/ui (Radix) · TanStack Query 5 · React Hook Form · Zod 4 |
 | Backend  | Django 5.2 LTS · Django REST Framework · SimpleJWT · PostgreSQL 17 · Redis 7 (cache/throttling) · drf-spectacular (OpenAPI) |
 | Tooling  | Docker Compose · pytest · ruff · ESLint · `tsc` |
-| DevOps   | GitHub Actions · GitHub Container Registry · Trivy · CodeQL · gitleaks · Dependabot · Terraform · Ansible · k3s · Helm · Argo CD · CloudNativePG · cert-manager · Sealed Secrets · Oracle Cloud |
+| DevOps   | GitHub Actions · GitHub Container Registry · Trivy · CodeQL · gitleaks · Dependabot · Terraform · Ansible · k3s · Helm · Argo CD · Prometheus · Grafana · Loki · CloudNativePG · cert-manager · Sealed Secrets · Oracle Cloud |
 
 > "Yathra" is a working name. Change it with `APP_NAME` (backend) and `NEXT_PUBLIC_APP_NAME` (frontend).
 

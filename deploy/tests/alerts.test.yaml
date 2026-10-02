@@ -1,0 +1,141 @@
+# Unit tests for the chart's alert rules: synthetic metrics in, expected alerts out.
+# CI renders the rules for the namespace "yathra-test" to /tmp/rules/yathra.rules.yaml and runs:
+#   promtool test rules deploy/tests/alerts.test.yaml
+# Each test proves an alert fires when it should — and stays quiet when it should not.
+rule_files:
+  - /tmp/rules/yathra.rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - name: API down fires after five minutes without a healthy pod, not before
+    interval: 1m
+    input_series:
+      - series: 'up{namespace="yathra-test", service="yathra-api", pod="api-1"}'
+        values: "1 1 0x10"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: YathraApiDown
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: YathraApiDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "yathra-test: the API has no healthy pods"
+              description: "Prometheus has not been able to scrape any API pod in yathra-test for 5 minutes."
+
+  - name: Server errors above 5% for ten minutes fire; 1% does not
+    interval: 1m
+    input_series:
+      # 100 requests a minute: 10 of them 5xx (10%)…
+      - series: 'django_http_responses_total_by_status_total{namespace="yathra-test", status="200"}'
+        values: "0+90x30"
+      - series: 'django_http_responses_total_by_status_total{namespace="yathra-test", status="500"}'
+        values: "0+10x30"
+      # …and in another environment, 1 of 100 (1%).
+      - series: 'django_http_responses_total_by_status_total{namespace="yathra-other", status="200"}'
+        values: "0+99x30"
+      - series: 'django_http_responses_total_by_status_total{namespace="yathra-other", status="500"}'
+        values: "0+1x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: YathraHighErrorRate
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "yathra-test: more than 5% of API responses are server errors"
+              description: "10% of responses were 5xx over the last 5 minutes."
+
+  - name: A p95 above one second fires
+    interval: 1m
+    input_series:
+      # Every request lands in the 1–2.5 s bucket.
+      - series: 'django_http_requests_latency_seconds_by_view_method_bucket{namespace="yathra-test", le="0.5"}'
+        values: "0x30"
+      - series: 'django_http_requests_latency_seconds_by_view_method_bucket{namespace="yathra-test", le="1.0"}'
+        values: "0x30"
+      - series: 'django_http_requests_latency_seconds_by_view_method_bucket{namespace="yathra-test", le="2.5"}'
+        values: "0+60x30"
+      - series: 'django_http_requests_latency_seconds_by_view_method_bucket{namespace="yathra-test", le="+Inf"}'
+        values: "0+60x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: YathraSlowResponses
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "yathra-test: the slowest 5% of API requests take over a second"
+              description: "95th percentile latency is 2.425s."
+
+  - name: Fast responses stay quiet
+    interval: 1m
+    input_series:
+      - series: 'django_http_requests_latency_seconds_by_view_method_bucket{namespace="yathra-test", le="0.5"}'
+        values: "0+60x30"
+      - series: 'django_http_requests_latency_seconds_by_view_method_bucket{namespace="yathra-test", le="+Inf"}'
+        values: "0+60x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: YathraSlowResponses
+        exp_alerts: []
+
+  - name: The database reported down fires after two minutes
+    interval: 1m
+    input_series:
+      - series: 'cnpg_collector_up{namespace="yathra-test", cluster="yathra-db", pod="yathra-db-1"}'
+        values: "1 1 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: YathraDatabaseDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "yathra-test: PostgreSQL is not responding"
+              description: "CloudNativePG reports the yathra-db database as down."
+
+  - name: A failed run of a CronJob fires, naming the CronJob; a plain Job does not
+    interval: 1m
+    input_series:
+      - series: 'kube_job_status_failed{namespace="yathra-test", job_name="yathra-send-notifications-29848851"}'
+        values: "1x5"
+      - series: 'kube_job_owner{namespace="yathra-test", job_name="yathra-send-notifications-29848851", owner_kind="CronJob", owner_name="yathra-send-notifications"}'
+        values: "1x5"
+      - series: 'kube_job_status_failed{namespace="yathra-test", job_name="yathra-migrate-abc"}'
+        values: "1x5"
+      - series: 'kube_job_owner{namespace="yathra-test", job_name="yathra-migrate-abc", owner_kind="<none>", owner_name="<none>"}'
+        values: "1x5"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: YathraScheduledJobFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              owner_name: yathra-send-notifications
+            exp_annotations:
+              summary: "yathra-test: scheduled job yathra-send-notifications failed"
+              description: "kubectl -n yathra-test logs job/<the failed job> shows why."
+
+  - name: A certificate with 10 days left fires; one with 60 days does not
+    interval: 1m
+    input_series:
+      # Unix time of expiry: 10 days after the test's start (time() = 0 at t=0).
+      - series: 'certmanager_certificate_expiration_timestamp_seconds{exported_namespace="yathra-test", name="yathra-tls"}'
+        values: "864000x5"
+      - series: 'certmanager_certificate_expiration_timestamp_seconds{exported_namespace="yathra-other", name="yathra-tls"}'
+        values: "5184000x5"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: YathraCertificateExpiring
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              exported_namespace: yathra-test
+              name: yathra-tls
+            exp_annotations:
+              summary: "yathra-test: the TLS certificate expires in under 14 days"
+              description: "cert-manager has not managed to renew it: kubectl -n yathra-test describe certificate"
