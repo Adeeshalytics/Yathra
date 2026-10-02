@@ -36,7 +36,7 @@ up-gitops: cluster images ## The same, but Argo CD installs everything from GitH
 	@echo "Argo CD: 'make argocd-ui'. The site: http://yathra.localhost once 'make status' is all Running."
 
 grafana: ## Open a tunnel to Grafana on http://localhost:3000 (dashboards "Yathra — <namespace>")
-	kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80
+	kubectl -n monitoring port-forward svc/grafana 3000:80
 
 argocd-ui: ## Print the Argo CD admin password and open a tunnel to the UI on :8443
 	@echo "user admin, password: $$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"

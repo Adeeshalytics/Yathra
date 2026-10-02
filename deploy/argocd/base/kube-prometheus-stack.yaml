@@ -23,15 +23,6 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
-  # Grafana's chart generates a random admin password on every render (it cannot look up the
-  # existing one when Argo CD renders it), which would leave the app permanently OutOfSync.
-  # Grafana's login is switched off anyway (values file), so the first password is kept.
-  ignoreDifferences:
-    - kind: Secret
-      name: monitoring-grafana
-      namespace: monitoring
-      jsonPointers:
-        - /data/admin-password
   syncPolicy:
     automated:
       prune: true
@@ -40,4 +31,3 @@ spec:
       - CreateNamespace=true
       # Its CRDs are far too large for client-side apply's last-applied annotation.
       - ServerSideApply=true
-      - RespectIgnoreDifferences=true

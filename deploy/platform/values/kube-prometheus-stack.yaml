@@ -77,8 +77,13 @@ alertmanager:
       - name: "null"
 
 grafana:
+  fullnameOverride: grafana
   # Grafana is reached only through `kubectl port-forward`, i.e. by someone who already
   # administers the cluster, so it skips its own login rather than keep another password.
+  # No admin account is created at all: otherwise the chart generates a random password on
+  # every render, and under Argo CD that would restart Grafana on every sync.
+  env:
+    GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION: "true"
   grafana.ini:
     auth:
       disable_login_form: true
