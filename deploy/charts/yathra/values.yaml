@@ -147,7 +147,8 @@ backup:
   enabled: false
   destinationPath: "" # s3://<bucket>/<environment>
   endpointURL: "" # empty for AWS; Oracle: https://<namespace>.compat.objectstorage.<region>.oraclecloud.com
-  region: "" # set to read REGION from the credentials Secret (Oracle needs it)
+  # Oracle's S3 API needs the region: true reads it from the credentials Secret's REGION key.
+  regionFromSecret: false
   # Secret with ACCESS_KEY_ID and ACCESS_SECRET_KEY (and REGION). sealedCredentials creates it
   # from values sealed for this cluster; otherwise it must exist.
   credentialsSecret: yathra-backup-credentials

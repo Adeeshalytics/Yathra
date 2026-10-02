@@ -1,5 +1,6 @@
 # Copy to terraform.tfvars (git-ignored) and fill in.
 tenancy_ocid = "ocid1.tenancy.oc1..aaaaaaaa…"
+user_ocid    = "ocid1.user.oc1..aaaaaaaa…" # the user= line in ~/.oci/config
 
 # Who may reach SSH and the Kubernetes API. `make my-ip` prints your current address.
 # Home connections often change address; update this and `make apply` again when they do.

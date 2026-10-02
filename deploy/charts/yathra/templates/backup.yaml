@@ -26,9 +26,9 @@ spec:
       secretAccessKey:
         name: {{ .Values.backup.credentialsSecret }}
         key: ACCESS_SECRET_KEY
-      {{- with .Values.backup.region }}
+      {{- if .Values.backup.regionFromSecret }}
       region:
-        name: {{ $.Values.backup.credentialsSecret }}
+        name: {{ .Values.backup.credentialsSecret }}
         key: REGION
       {{- end }}
     wal:

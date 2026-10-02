@@ -8,6 +8,16 @@ variable "tenancy_ocid" {
   }
 }
 
+variable "user_ocid" {
+  description = "OCID of your Oracle user (the user= line in ~/.oci/config). Owns the backups' S3 key."
+  type        = string
+
+  validation {
+    condition     = startswith(var.user_ocid, "ocid1.user.")
+    error_message = "user_ocid must be a user OCID (ocid1.user.…)."
+  }
+}
+
 variable "region" {
   description = "Home region. Always Free resources exist only there."
   type        = string

@@ -91,6 +91,7 @@ template: ## Render the chart with the local values (no cluster needed)
 object-store: ## A local S3-compatible store (RustFS) for database backups, with its credentials
 	kubectl apply -f local/object-store.yaml
 	kubectl -n object-store rollout status deploy/rustfs --timeout=5m
+	kubectl -n object-store wait job/create-backup-bucket --for=condition=Complete --timeout=5m
 	kubectl -n $(NAMESPACE) create secret generic yathra-backup-credentials \
 	  --from-literal=ACCESS_KEY_ID=local-backups --from-literal=ACCESS_SECRET_KEY=local-backups-not-a-secret \
 	  --dry-run=client -o yaml | kubectl apply -f -

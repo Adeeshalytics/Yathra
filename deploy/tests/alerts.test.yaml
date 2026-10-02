@@ -139,3 +139,49 @@ tests:
             exp_annotations:
               summary: "yathra-test: the TLS certificate expires in under 14 days"
               description: "cert-manager has not managed to renew it: kubectl -n yathra-test describe certificate"
+
+  - name: WAL archiving that keeps failing fires; a failure followed by success does not
+    interval: 1m
+    input_series:
+      # Failing since minute 2: the last failure is newer than the last success.
+      - series: 'cnpg_pg_stat_archiver_last_failed_time{namespace="yathra-test", pod="yathra-db-1"}'
+        values: "0 0 120+60x30"
+      - series: 'cnpg_pg_stat_archiver_last_archived_time{namespace="yathra-test", pod="yathra-db-1"}'
+        values: "60x32"
+      # Elsewhere: one failure at minute 2, then archiving recovers.
+      - series: 'cnpg_pg_stat_archiver_last_failed_time{namespace="yathra-other", pod="yathra-db-1"}'
+        values: "0 0 120x30"
+      - series: 'cnpg_pg_stat_archiver_last_archived_time{namespace="yathra-other", pod="yathra-db-1"}'
+        values: "0 0 0 180+60x29"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: YathraWalArchivingFailing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              namespace: yathra-test
+              pod: yathra-db-1
+            exp_annotations:
+              summary: "yathra-test: PostgreSQL cannot archive its WAL to the object store"
+              description: "kubectl -n yathra-test logs yathra-db-1 -c plugin-barman-cloud shows why (credentials, bucket, network)."
+
+  - name: No backup for over a day fires; a recent one does not
+    # Samples every minute, as the exporter really reports: with hourly samples the series would
+    # count as absent between them (Prometheus looks back only 5 minutes).
+    interval: 1m
+    input_series:
+      # Last backup at t=0; by t=28h it is 28 hours old.
+      - series: 'barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="yathra-test"}'
+        values: "0x1700"
+    alert_rule_test:
+      - eval_time: 20h
+        alertname: YathraBackupStale
+        exp_alerts: []
+      - eval_time: 28h
+        alertname: YathraBackupStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "yathra-test: no successful database backup in over a day"
+              description: "kubectl -n yathra-test get backups shows the recent ones and their errors."

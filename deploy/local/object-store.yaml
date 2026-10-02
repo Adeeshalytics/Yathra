@@ -87,3 +87,38 @@ spec:
     app: rustfs
   ports:
     - port: 9000
+---
+# Barman does not create buckets: make the one the local environment backs up to.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-backup-bucket
+  namespace: object-store
+spec:
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-bucket
+          image: amazon/aws-cli:2.37.8
+          command:
+            - sh
+            - -c
+            - aws s3api head-bucket --bucket yathra-backups || aws s3api create-bucket --bucket yathra-backups
+          env:
+            - name: AWS_ENDPOINT_URL
+              value: http://rustfs:9000
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: rustfs
+                  key: RUSTFS_ACCESS_KEY
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rustfs
+                  key: RUSTFS_SECRET_KEY
