@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 
 /**
  * The API the browser talks to. Its origin has to be named in connect-src, because the
- * Content-Security-Policy below only allows this app to call itself otherwise.
+ * Content-Security-Policy below only allows this app to call itself otherwise. A path-only API
+ * URL (/api/v1) is this app's own origin, which 'self' already covers.
  */
 function apiOrigin(): string {
   const url = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";

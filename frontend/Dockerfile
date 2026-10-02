@@ -20,7 +20,8 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # NEXT_PUBLIC_* values are inlined into the client bundle at build time.
-ARG NEXT_PUBLIC_API_URL
+# A path (the default) means "the API on this site, under /api": one image for every domain.
+ARG NEXT_PUBLIC_API_URL=/api/v1
 ARG NEXT_PUBLIC_APP_NAME=Yathra
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
     NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME

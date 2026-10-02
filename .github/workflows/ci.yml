@@ -34,9 +34,10 @@ permissions:
 env:
   PYTHON_VERSION: "3.13" # matches python:3.13-slim in backend/Dockerfile
   NODE_VERSION: "24" # matches node:24-alpine in frontend/Dockerfile
-  # NEXT_PUBLIC_* values are compiled into the browser bundle. Until the app is deployed
-  # (docs/devops/01-ci.md, "One image, many environments") the image points at a local API.
-  NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1' }}
+  # NEXT_PUBLIC_* values are compiled into the browser bundle. A path, not a host: the ingress
+  # serves the API under /api on whatever domain the site is on, so one image fits every
+  # environment (docs/devops/03-kubernetes.md).
+  NEXT_PUBLIC_API_URL: /api/v1
 
 jobs:
   backend:
