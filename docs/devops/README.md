@@ -11,7 +11,7 @@ should be able to answer about it.
 | **D2 — Infrastructure as code** | Terraform for Oracle Cloud (network, Arm node, remote state with locking, quota + budget guardrails), Ansible to harden the server and install k3s | [Notes](02-iac.md) |
 | **D3 — Kubernetes** | Helm chart (API, web, migration Job, CronJobs, CloudNativePG, Redis, ingress), cert-manager, Sealed Secrets, "restricted" pod security, tested end to end on a local k3d cluster | [Notes](03-kubernetes.md) |
 | **D4 — GitOps** | Argo CD app-of-apps: CI commits the image tag, staging syncs itself, production is promoted by pull request, rollback is `git revert`; bootstrapped from an empty cluster | [Notes](04-gitops.md) |
-| D5 — Observability | Prometheus, Grafana, Loki, Alertmanager → Discord/e-mail, `django-prometheus` app metrics, Sentry, uptime checks | Planned |
+| **D5 — Observability** | Prometheus (golden signals + business-event metrics), Loki + Alloy logs, Grafana dashboard and unit-tested alert rules shipped in the chart, external uptime checks | [Notes](05-observability.md) |
 | D6 — Reliability | Nightly backups to object storage + a restore drill, k6 load test of search → hold → book, autoscaling, network policies, runbook | Planned |
 
 ## Free services this relies on
