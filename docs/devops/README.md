@@ -8,7 +8,7 @@ should be able to answer about it.
 | Phase | What it adds | Status |
 |-------|--------------|--------|
 | **D1 — CI** | GitHub Actions: lint, tests on real Postgres, production image builds, Trivy / CodeQL / gitleaks scans, Dependabot, multi-arch images on GHCR with signed provenance | [Notes](01-ci.md) |
-| D2 — Infrastructure as code | Terraform for Oracle Cloud Always Free (network, ARM servers, storage bucket, remote state), Ansible to harden the server and install k3s | Planned |
+| **D2 — Infrastructure as code** | Terraform for Oracle Cloud (network, Arm node, remote state with locking, quota + budget guardrails), Ansible to harden the server and install k3s | [Notes](02-iac.md) |
 | D3 — Kubernetes | Helm chart: API + web Deployments, migration Job, CronJobs for the scheduled commands, CloudNativePG, Redis, ingress + cert-manager, Sealed Secrets, staging and prod namespaces | Planned |
 | D4 — GitOps | Argo CD: CI bumps the image tag in Git, staging syncs itself, prod is promoted by pull request, rollback is `git revert` | Planned |
 | D5 — Observability | Prometheus, Grafana, Loki, Alertmanager → Discord/e-mail, `django-prometheus` app metrics, Sentry, uptime checks | Planned |
@@ -19,7 +19,7 @@ should be able to answer about it.
 | Need | Service | Notes |
 |------|---------|-------|
 | CI minutes, ARM runners, image registry | GitHub Actions, GHCR | Unlimited for public repositories |
-| Servers | Oracle Cloud Always Free | 4 ARM cores, 24 GB RAM, 200 GB disk, 20 GB object storage. Idle instances can be reclaimed — keep everything in Terraform |
+| Servers | Oracle Cloud Always Free, on a Pay As You Go account | Arm (A1): 2 OCPUs and 12 GB all month; 200 GB of disk; 20 GB of object storage (10 GB standard on Pay As You Go). The account is upgraded because free-only accounts kept getting "Out of host capacity"; quotas and budget alerts keep it at zero ([D2](02-iac.md)) |
 | DNS, TLS | Cloudflare (free plan), Let's Encrypt | |
 | Domain | See below | |
 | E-mail | Brevo or Resend free tier | Texts stay on the console backend (Notify.lk is paid) |

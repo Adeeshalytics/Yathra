@@ -1,0 +1,7 @@
+# Files that run on Linux keep LF line endings, even in a Windows checkout with
+# core.autocrlf=true: a CR at the end of a shell line, a Makefile recipe or a rendered config
+# file (sshd, k3s) breaks it.
+*.sh       text eol=lf
+Makefile   text eol=lf
+infra/**   text eol=lf
+.github/** text eol=lf

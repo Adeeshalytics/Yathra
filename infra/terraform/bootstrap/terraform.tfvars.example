@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars (git-ignored) and fill in.
+tenancy_ocid       = "ocid1.tenancy.oc1..aaaaaaaa…"
+budget_alert_email = "you@example.com"
+
+# Defaults, shown for reference:
+# region             = "ap-hyderabad-1"
+# oci_config_profile = "DEFAULT"
+# project            = "yathra"
+# budget_amount      = 1

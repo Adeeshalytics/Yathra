@@ -37,13 +37,16 @@ Magiya.lk), built in phases:
   production images and scanned (Trivy, CodeQL, gitleaks); `main` publishes multi-arch images
   to GitHub Container Registry with signed build provenance. See
   [docs/devops](docs/devops/README.md).
+- **DevOps D2: infrastructure as code** — Terraform for the Oracle Cloud network and Arm node
+  (remote state, quota and budget guardrails that keep it free), Ansible to harden the server
+  and install k3s. See [docs/devops/02-iac.md](docs/devops/02-iac.md).
 
 | Layer    | Stack |
 |----------|-------|
 | Frontend | Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · shadcn/ui (Radix) · TanStack Query 5 · React Hook Form · Zod 4 |
 | Backend  | Django 5.2 LTS · Django REST Framework · SimpleJWT · PostgreSQL 17 · Redis 7 (cache/throttling) · drf-spectacular (OpenAPI) |
 | Tooling  | Docker Compose · pytest · ruff · ESLint · `tsc` |
-| DevOps   | GitHub Actions · GitHub Container Registry · Trivy · CodeQL · gitleaks · Dependabot |
+| DevOps   | GitHub Actions · GitHub Container Registry · Trivy · CodeQL · gitleaks · Dependabot · Terraform · Ansible · k3s · Oracle Cloud |
 
 > "Yathra" is a working name. Change it with `APP_NAME` (backend) and `NEXT_PUBLIC_APP_NAME` (frontend).
 

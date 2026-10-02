@@ -1,0 +1,84 @@
+- name: Create the k3s configuration directory
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# The install script and the service both read this file, so the cluster's settings live in
+# version control instead of in a long command line.
+- name: Write the k3s configuration
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart k3s
+
+- name: Check which k3s version is installed
+  ansible.builtin.command: /usr/local/bin/k3s --version
+  register: k3s_installed
+  changed_when: false
+  failed_when: false
+
+# The script is taken from the same release tag as the binary it installs, not from the moving
+# https://get.k3s.io, and it verifies the binary's checksum before installing it.
+- name: Download the k3s install script for {{ k3s_version }}
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/k3s-io/k3s/{{ k3s_version | urlencode }}/install.sh"
+    dest: /usr/local/bin/k3s-install.sh
+    owner: root
+    group: root
+    mode: "0755"
+    force: true
+  when: k3s_installed.rc != 0 or k3s_version not in k3s_installed.stdout
+
+- name: Install or upgrade k3s
+  ansible.builtin.command: /usr/local/bin/k3s-install.sh
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version }}"
+    INSTALL_K3S_EXEC: server
+  changed_when: true
+  when: k3s_installed.rc != 0 or k3s_version not in k3s_installed.stdout
+
+- name: Make sure k3s runs and starts on boot
+  ansible.builtin.service:
+    name: k3s
+    state: started
+    enabled: true
+
+- name: Apply a pending configuration change before checking the node
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for the node to be Ready
+  ansible.builtin.command: k3s kubectl wait --for=condition=Ready node --all --timeout=300s
+  changed_when: false
+
+- name: Read the admin kubeconfig
+  ansible.builtin.slurp:
+    src: /etc/rancher/k3s/k3s.yaml
+  register: k3s_kubeconfig
+
+- name: Create ~/.kube on this machine
+  ansible.builtin.file:
+    path: "{{ k3s_local_kubeconfig | dirname }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+
+# The node's copy points at 127.0.0.1 and names everything "default"; the local copy points at
+# the public address (allowed through the NSG for admin addresses only) and is named after
+# the project, so it sits next to other clusters in one kubeconfig without clashing.
+- name: Save the kubeconfig on this machine
+  ansible.builtin.copy:
+    content: >-
+      {{ k3s_kubeconfig.content | b64decode
+         | replace('https://127.0.0.1:6443', 'https://' ~ public_ip ~ ':6443')
+         | regex_replace('(?m)^(\s*(?:- )?(?:name|cluster|user|current-context):) default$', '\1 ' ~ k3s_context_name) }}
+    dest: "{{ k3s_local_kubeconfig }}"
+    mode: "0600"
+  delegate_to: localhost
+  become: false

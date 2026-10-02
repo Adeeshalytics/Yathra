@@ -1,0 +1,15 @@
+- name: Check and reload sshd
+  # Test the whole configuration first: a broken sshd_config would lock everyone out.
+  ansible.builtin.command: sshd -t
+  changed_when: false
+  notify: Reload sshd
+
+- name: Reload sshd
+  ansible.builtin.service:
+    name: ssh
+    state: reloaded
+
+- name: Restart journald
+  ansible.builtin.service:
+    name: systemd-journald
+    state: restarted

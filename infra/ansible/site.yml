@@ -1,0 +1,12 @@
+# Turns a fresh Ubuntu server into a hardened single-node k3s cluster.
+# Safe to run again at any time: every task describes a state, not a step.
+#
+#   make configure          (from infra/, inside WSL)
+
+- name: Configure the k3s node
+  hosts: k3s_servers
+  become: true
+  roles:
+    - role: base # patches, SSH hardening, automatic security updates, fail2ban
+    - role: firewall # host firewall rules k3s needs (Oracle's images block forwarding)
+    - role: k3s # k3s server, local kubeconfig

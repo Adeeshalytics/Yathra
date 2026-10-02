@@ -1,0 +1,72 @@
+- name: Bring every package up to date
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+    upgrade: safe
+
+- name: Install base tools
+  ansible.builtin.apt:
+    name:
+      - fail2ban
+      - unattended-upgrades
+      - curl
+      - jq
+      - htop
+    state: present
+
+- name: Set the time zone
+  community.general.timezone:
+    name: "{{ timezone }}"
+
+- name: Harden the SSH server
+  ansible.builtin.template:
+    src: sshd-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/10-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Check and reload sshd
+
+- name: Install security updates automatically
+  ansible.builtin.copy:
+    src: 52yathra-unattended-upgrades
+    dest: /etc/apt/apt.conf.d/52yathra-unattended-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create the journald drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Cap the journal's disk use
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/10-size.conf
+    content: |
+      [Journal]
+      SystemMaxUse=500M
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart journald
+
+- name: Keep fail2ban running (bans addresses that keep failing SSH logins)
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: true
+
+- name: Check whether the upgrade needs a reboot
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: base_reboot_required
+
+- name: Reboot into the new kernel
+  ansible.builtin.reboot:
+    msg: Rebooting after package upgrades (Ansible)
+    reboot_timeout: 600
+  when: base_reboot_required.stat.exists

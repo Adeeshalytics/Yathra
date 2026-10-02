@@ -1,0 +1,99 @@
+# Checks for the infrastructure code (infra/). See docs/devops/02-iac.md.
+#
+# These run without any cloud credentials: formatting, validation against the provider schema,
+# linting and a misconfiguration scan. `terraform plan` and `apply` stay on the workstation —
+# CI never holds a key that can change the Oracle Cloud account.
+
+name: Infrastructure
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: infra-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  TERRAFORM_VERSION: "1.16.4" # matches infra/scripts/setup-wsl.sh
+
+jobs:
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Format
+        run: terraform fmt -check -recursive -diff infra/terraform
+
+      # -lockfile=readonly: fail if .terraform.lock.hcl is missing a provider or a checksum,
+      # instead of quietly trusting whatever the registry serves today.
+      - name: Validate
+        run: |
+          for stack in bootstrap cluster; do
+            echo "::group::$stack"
+            terraform -chdir="infra/terraform/$stack" init -backend=false -input=false -lockfile=readonly
+            terraform -chdir="infra/terraform/$stack" validate
+            echo "::endgroup::"
+          done
+
+      - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
+        with:
+          tflint_version: v0.64.0
+
+      - name: Lint (tflint)
+        working-directory: infra/terraform
+        run: tflint --recursive --format compact
+
+      - name: Misconfiguration scan (Trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: infra/terraform
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          hide-progress: true
+
+  ansible:
+    name: Ansible
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: infra/ansible
+    env:
+      ANSIBLE_CONFIG: ${{ github.workspace }}/infra/ansible/ansible.cfg
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install Ansible
+        run: pip install "ansible-core==2.21.4" "ansible-lint==26.9.0"
+
+      - name: Install collections
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Syntax check
+        run: ansible-playbook --syntax-check site.yml
+
+      - name: Lint (ansible-lint, production profile)
+        run: ansible-lint --profile production
